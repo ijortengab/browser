@@ -1,0 +1,13 @@
+{
+    "name": "ijortengab/browser",
+    "description": "HTTP Requester like a browser, automatically save cookie, follow location, and save the history and cache.",
+    "type": "library",
+    "license": "GPL",
+    "authors": [
+        {
+            "name": "ijortengab",
+            "email": "m_roji28@yahoo.com"
+        }
+    ],
+    "require": {}
+}
