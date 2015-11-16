@@ -19,7 +19,7 @@ namespace IjorTengab\Browser;
  *   http://php.net/manual/en/language.oop5.traits.php#language.oop5.traits.properties.conflicts
  *
  */
-trait FileSystem {
+trait FileSystemTrait {
 
 
     /**

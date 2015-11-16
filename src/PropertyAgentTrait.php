@@ -5,7 +5,7 @@ namespace IjorTengab\Browser;
  * Trait berisi method untuk melakukan operasi update atau retrieve
  * value dari property bertipe array secara mudah dan mengasyikkan.
  */
-trait PropertyAgent {
+trait PropertyAgentTrait {
 
     /**
      * Method propertyAgent tidak disarankan untuk penggunaan secara langsung.

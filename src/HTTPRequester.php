@@ -10,7 +10,7 @@ class HTTPRequester
     /**
      * Calling required traits.
      */
-    use PropertyAgent;
+    use PropertyAgentTrait;
 
     /**
      * The main URL to request http.

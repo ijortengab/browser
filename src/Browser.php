@@ -19,7 +19,7 @@ class Browser extends HTTPRequester
     /**
      * Load berbagai method terkait direktori.
      */
-    use FileSystem;
+    use FileSystemTrait;
 
 
 
