@@ -9,5 +9,7 @@
             "email": "m_roji28@yahoo.com"
         }
     ],
-    "require": {}
+    "require": {
+        "parsecsv/php-parsecsv": "0.4.5"
+    }
 }
