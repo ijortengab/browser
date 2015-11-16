@@ -16,7 +16,7 @@
  *   - auto remove cookie yang epxired.
  */
 
-namespace IjorTengab;
+namespace IjorTengab\Browser;
 
 /**
  * Trait berisi method untuk melakukan operasi update atau retrieve

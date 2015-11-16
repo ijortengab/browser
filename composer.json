@@ -5,11 +5,16 @@
     "license": "GPL",
     "authors": [
         {
-            "name": "ijortengab",
-            "email": "m_roji28@yahoo.com"
+            "name": "IjorTengab",
+            "email": "m_roji28@yahoo.com",
+            "homepage": "http://github.com/ijortengab",
+            "role": "Developer"
         }
     ],
     "require": {
         "parsecsv/php-parsecsv": "0.4.5"
+    },
+    "autoload": {
+        "psr-4": {"IjorTengab\\Browser\\": "src/"}
     }
 }
