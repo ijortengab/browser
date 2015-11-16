@@ -11,446 +11,225 @@
  *
  * @version
  *   0.1
+ *
+ * @todo
+ *   - auto remove cookie yang epxired.
  */
- 
+
 namespace IjorTengab;
 
-class Browser extends Engine
-{
-    
-    
+/**
+ * Trait berisi method untuk melakukan operasi update atau retrieve
+ * value dari property bertipe array secara mudah dan mengasyikkan.
+ */
+trait PropertyAgent {
+
+    /**
+     * Method propertyAgent tidak disarankan untuk penggunaan secara langsung.
+     * Sebaiknya ada method lain yang menggunakan method ini sebagai wrapper.
+     * Seperti contoh dibawah ini:
+     *
+     *   <?php
+     *
+     *   // Code ini berada didalam sebuah class.
+     *
+     *   use PropertyAgent;
+     *
+     *   var $options = array(
+     *     'homepage' => 'http://github.com/ijortengab',
+     *     'email' => 'm_roji28@yahoo.com',
+     *   );
+     *
+     *   // Method options() dibuat sebagai wrapper method propertyAgent().
+     *   public function options() {
+     *     return $this->propertyAgent('options', func_get_args());
+     *   }
+     *   ?>
+     *
+     * Sesuai contoh diatas, maka kita akan mudah untuk melakukan retrieve
+     * atau update dari property $options. Property harus bertipe array.
+     *
+     *   <?php
+     *
+     *   // Retrieve semua nilai dari property $options.
+     *   $array = $this->options();
+     *
+     *   // Retrieve value yang mempunyai key 'homepage'.
+     *   $homepage = $this->options('homepage');
+     *
+     *   // Update value yang mempunyai key 'email'.
+     *   $this->options('email', 'm.roji28@gmail.com');
+     *
+     *   // Update keseluruhan nilai dari property $options
+     *   $this->options($array);
+     *
+     *   // Clear property $options (empty array)
+     *   $this->options(NULL);
+     *
+     *   ?>
+     *
+     */
+    protected function propertyAgent($property, $args = array()) {
+
+        // Tidak menciptakan property baru.
+        // Jika property tidak exists, kembalikan null.
+        if (!property_exists(__CLASS__, $property)) {
+            return;
+        }
+        switch (count($args)) {
+            case 0:
+                // Retrieve value from $property.
+                return $this->{$property};
+
+            case 1:
+                $variable = array_shift($args);
+                // If NULL, it means reset.
+                if (is_null($variable)) {
+                    $this->{$property} = array();
+                }
+                // If Array, it meanse replace all value with that array.
+                elseif (is_array($variable)) {
+                    $this->{$property} = $variable;
+                }
+                // Otherwise, it means get one info {$property} by key.
+                elseif (isset($this->{$property}[$variable])) {
+                    return $this->{$property}[$variable];
+                }
+                return NULL;
+                break;
+
+            case 2:
+                // It means set info option.
+                $key = array_shift($args);
+                $value = array_shift($args);
+                $this->{$property}[$key] = $value;
+                break;
+        }
+
+        // Return object back.
+        return $this;
+    }
 }
 
-class Engine 
-{
-
-    // The main URL.
-    private $url;
-
-    // The $url property can change anytime because of redirect,
-    // so we keep information about $original_url for reference.
-    protected $original_url;
-
-    // The variable that stored result of function parse_url().
-    // Use for quickreference.
-    protected $parse_url;
-
-    // Current working directory, a place for save anything.
-    private $cwd;
-
-    // We are using PHP's Stream as default.
-    // If you prefer using curl, set as TRUE with method $this->scurl(TRUE).
-    private $curl = FALSE;
-
-    // Options that needed when you browsing.
-    /*
-    options used by curl
-    encoding (default: gzip, deflate)
-    timeout (default: 30)
-    referer
+/**
+ * Trait berisi method untuk melakukan operasi terkait File System.
+ * Diambil dari dokumentasi PHP berjudul "File System Related Extensions".
+ * Sebagian code diambil dari fungsi drupal pada file includes/file.inc.
+ *
+ * Trait men-declare property:
+ *   public $error = array();
+ *   private $cwd = __DIR__;
+ *
+ *
+ * Pastikan tidak bentrok dengan class yang menggunakan trait ini.
+ * Kunjungi Conflict Resolution pada dokumentasi PHP.
+ *
+ * @link
+ *   http://php.net/manual/en/ref.dir.php
+ *   http://php.net/manual/en/language.oop5.traits.php#language.oop5.traits.properties.conflicts
+ *
+ */
+trait FileSystem {
 
 
-    options used by stream
-    'method' => 'GET',
-    'data' => NULL,
-    'max_redirects' => 3,
-    'timeout' => 30.0,
-    'context' => NULL,
-
-
+    /**
+     * Current Working Directory.
+     * Direktori tempat menyimpan apapun untuk keperluan simpan file.
+     * Untuk mengubah nilai ini, gunakan method setCwd().
+     * Untuk mendapatkan nilai ini, gunakan method getCwd().
      */
-    protected $options = array();
+    private $cwd = __DIR__;
 
-    // Header that needed when you request HTTP.
-    protected $headers = array();
-
-    // Post
-    protected $post = array();
-
-    // Object result after browsing, contains info at least:
-    // header response and body response.
-    public $result;
-
-    // Object state.
-    private $state;
-
-    // Name of state file
-    public $state_filename = 'state.info';
-
-    // Object cookie.
-    private $cookie;
-
-    // Name of cookie file
-    public $cookie_filename = 'cookie.csv';
-
-    // Name of history file.
-    public $history_filename = 'access.log';
-
-    // Name of cache file.
-    public $cache_filename = 'cache.html';
-
-    // The real of cache file_name that has storage,
-    // because we use autoincreament suffix in filename
-    // to void overwriting file cache.
-    var $cache;
-
-    // Info about error.log
+    /**
+     * Property penyimpanan error.
+     */
     public $error = array();
 
-    // Info about access.log
-    public $access = array();
-
-    // storage to count time browsing.
-    var $timer;
-
-    function __construct($url = NULL) {
-        // Set url.
-        if (!empty($url)) {
-            $this->setUrl($url);
-        }
-        // Set working directory with same place.
-        $this->setCwd(__DIR__);
-
-        // Prefered using curl.
-        $this->curl(TRUE);
-        $this->options('encoding', 'gzip, deflate');
-    }
-
-    public function setUrl($url) {
+    /**
+     * Melakukan fungsi mkdir() dan diperkaya dengan penambahan informasi jika
+     * terjadi kegagalan.
+     */
+    public function mkdir($uri, $mode = 0775) {
         try {
-            $parse_url = parse_url($url);
-            if (!isset($parse_url['scheme'])) {
-                throw new Exception('Scheme pada URL tidak diketahui: "' . $url . '".');
+            if (is_dir($uri)) {
+                return TRUE;
             }
-            if (!in_array($parse_url['scheme'], array('http', 'https'))) {
-                throw new Exception('Scheme pada URL hanya mendukung http atau https: "' . $url . '".');
-            }
-            if (!isset($parse_url['host'])) {
-                throw new Exception('Host pada URL tidak diketahui: "' . $url . '".');
-            }
-            if (!isset($parse_url['path'])) {
-                // Untuk mencocokkan info pada cookie, maka path perlu ada,
-                // gunakan nilai default.
-                $parse_url['path'] = '/';
-            }
-            // Set property $url and $original_url
-            // for now, we must not edit $original_url again.
-            $this->url = $url;
-            if (!isset($this->original_url)) {
-                $this->original_url = $url;
-            }
-            $this->parse_url = $parse_url;
-
-            return $this;
-        }
-        catch (Exception $e) {
-            $this->error[] = $e->getMessage();
-        }
-    }
-
-    public function getUrl() {
-        return $this->url;
-    }
-
-    protected function mkdir($dir) {
-        try {
-            if (file_exists($dir)) {
+            if (file_exists($uri)) {
                 $something = 'something';
-                if (is_file($dir)) {
+                if (is_file($uri)) {
                     $something = 'file';
                 }
-                if (is_link($dir)) {
+                if (is_link($uri)) {
                     $something = 'link';
                 }
-                throw new Exception('Create directory cancelled, ' . $something . ' has same name and exists: "' . $dir . '".');
+                throw new \Exception('Create directory cancelled, a ' . $something . ' has same name and exists: "' . $uri . '".');
             }
-            $mode = $this->getState('file_chmod_directory', 0775);
-            if (@mkdir($dir, $mode, TRUE) === FALSE) {
-                throw new Exception('Create directory failed: "' . $dir . '".');
+            if (@mkdir($uri, $mode, TRUE) === FALSE) {
+                throw new \Exception('Create directory failed: "' . $uri . '".');
             }
             return TRUE;
         }
-        catch (Exception $e) {
+        catch (\Exception $e) {
             $this->error[] = $e->getMessage();
         }
     }
-
-    // This functin should fire in construct or soon after call this object.
+    
+    /**
+     * Melakukan perubahan pada property $cwd dan diperkaya dengan penambahan
+     * informasi jika terjadi kegagalan.
+     */
     public function setCwd($dir, $autocreate = FALSE) {
         try {
             if (!is_dir($dir) && !$autocreate) {
-                throw new Exception('Set directory failed, directory not exists: "' . $dir . '".');
+                throw new \Exception('Set directory failed, directory not exists: "' . $dir . '".');
             }
             if (!is_dir($dir) && $autocreate && !$this->mkdir($dir)) {
-                throw new Exception('Set directory failed, trying to create but failed: "' . $dir . '".');
+                throw new \Exception('Set directory failed, trying to create but failed: "' . $dir . '".');
             }
             if (!is_writable($dir)) {
-                throw new Exception('Set directory failed, directory is not writable: "' . $dir . '".');
+                throw new \Exception('Set directory failed, directory is not writable: "' . $dir . '".');
             }
+
+
+
             // Sebelum set.
             // Copy file-file yang berada di directory lama.
-            $old = $this->getCwd();
-            $new = $dir;
-            $files = array(
-                $this->state_filename,
-                $this->cookie_filename,
-                $this->history_filename,
-            );
-            foreach ($files as $file) {
-                if (file_exists($old . DIRECTORY_SEPARATOR . $file)) {
-                    rename($old . DIRECTORY_SEPARATOR . $file, $new . DIRECTORY_SEPARATOR . $file);
-                }
-            }
+            // $old = $this->getCwd();
+            // $new = $dir;
+            // $files = array(
+                // $this->state_filename,
+                // $this->cookie_filename,
+                // $this->history_filename,
+            // );
+            // foreach ($files as $file) {
+                // if (file_exists($old . DIRECTORY_SEPARATOR . $file)) {
+                    // rename($old . DIRECTORY_SEPARATOR . $file, $new . DIRECTORY_SEPARATOR . $file);
+                // }
+            // }
 
             // Directory sudah siap diset.
             $this->cwd = $dir;
+            return true;
         }
-        catch (Exception $e) {
+        catch (\Exception $e) {
             $this->error[] = $e->getMessage();
         }
     }
 
+    /**
+     * Mendapatkan nilai dari property $cwd.
+     */
     public function getCwd() {
         return $this->cwd;
     }
 
-    // Build and create file for our state.
-    protected function initState($autocreate = FALSE) {
-        // Current working directory is required.
-        try {
-            $filename = $this->cwd . DIRECTORY_SEPARATOR . $this->state_filename;
-            if (!file_exists($filename) && !$autocreate) {
-                return FALSE;
-            }
-            if (!isset($this->cwd)) {
-                throw new Exception('Current Working Directory not set yet, build State canceled.');
-            }
-            if (!file_exists($filename)) {
-                @file_put_contents($filename, '');
-            }
-            if (!file_exists($filename)) {
-                throw new Exception('Failed to create state file, build State canceled: "' . $filename . '".');
-            }
-            // Build object.
-            $this->state = new stateStorage($filename);
-            return TRUE;
-        }
-        catch (Exception $e) {
-            $this->error[] = $e->getMessage();
-        }
-    }
+    
 
-    // Similar with drupal's variable_set() function.
-    protected function setState($name, $value = NULL) {
-        if (empty($this->state) && !$this->initState(TRUE)) {
-            return;
-        }
-        $this->state->set($name, $value);
-        // Merge error.log.
-        $this->error = array_merge($this->error, $this->state->error);
-        // Return object to make a thread.
-        return $this;
-    }
-
-    // Similar with drupal's variable_get() function.
-    // If no argument passed, it means get all state.
-    protected function getState($name = NULL, $default = NULL) {
-        if (empty($this->state) && !$this->initState()) {
-            return $default;
-        }
-        $result = $this->state->get($name, $default);
-        // Merge error.log.
-        $this->error = array_merge($this->error, $this->state->error);
-        return $result;
-    }
-
-    // Similar with drupal's variable_del() function.
-    // If no argument passed, it means del all state.
-    protected function delState($name = NULL) {
-        if (empty($this->state) && !$this->initState()) {
-            return;
-        }
-        // todo, if name == NULL, maka destroy,
-        // tapi sebelumnya buat backup dulu agar tidak menyesal.
-
-        $this->state->del($name);
-        // Merge error.log.
-        $this->error = array_merge($this->error, $this->state->error);
-        // Return object to make a thread.
-        return $this;
-    }
-
-    // Build and create file for our cookie.
-    protected function initCookie($autocreate = FALSE) {
-        // Current working directory is required.
-        try {
-            $filename = $this->cwd . DIRECTORY_SEPARATOR . $this->cookie_filename;
-            if (!file_exists($filename) && !$autocreate) {
-                return FALSE;
-            }
-            if (!isset($this->cwd)) {
-                throw new Exception('Current Working Directory not set yet, build Cookie canceled.');
-            }
-            $create = FALSE;
-            if (!file_exists($filename)) {
-                $create = TRUE;
-            }
-            else {
-                $size = filesize($filename);
-                if (empty($size)) {
-                    $create = TRUE;
-                    // Perlu di clear info filesize
-                    // atau error saat eksekusi parent::_rfile().
-                    // @see: http://php.net/filesize > Notes.
-                    clearstatcache(TRUE, $filename);
-                }
-            }
-            if ($create) {
-                $header = implode(',', $this->_cookie_field());
-                file_put_contents($filename, $header . PHP_EOL);
-            }
-            if (!file_exists($filename)) {
-                throw new Exception('Failed to create cookie file, build Cookie canceled: "' . $filename . '".');
-            }
-            // Build object.
-            // Jangan masukkan $filename sebagai argument saat calling cookieStorage,
-            // agar tidak dilakukan parsing. Parsing hanya dilakukan saat melakukan
-            // method get.
-            $this->cookie = new cookieStorage;
-            $this->cookie->file = $filename;
-            return TRUE;
-        }
-        catch (Exception $e) {
-            $this->error[] = $e->getMessage();
-        }
-    }
-
-    // Save cookie from header response to file csv.
-    protected function setCookie() {
-        if (empty($this->cookie) && !$this->initCookie(TRUE)) {
-            return;
-        }
-        if (isset($this->result->headers['set-cookie'])) {
-            // Fungsi drupal_http_request() menggabungkan seluruh set-cookie dengan glue comma
-            // (lihat pada comment "Parse the response headers.").
-            // Jadi kita bisa memparsing nilai set-cookie dengan delimiter comma.
-            // Masalahnya ada nilai di header set-cookie yang menggunakan comma, yakni expires.
-            // Contoh:
-            // $string = 'PREF=ID=37b0fdc7d8efc120:FF=0:TM=1405944021:LM=1405944021:S=6saxUiBM66-kVP2D; expires=Wed, 20-Jul-2016 12:00:21 GMT; path=/; domain=.google.co.id,NID=67=M6yMDmCrGYYMc2O8AdfkjpDMLsCjxH9gmM51nhI1Gxu3UfYy6PHfak5TAswMfwNgwlqljoB5VcDMTFrgYm-18yWv0PfVwbVxIO5AGxxBAJVAbMNfGz-aL33Rxjik1uz9; expires=Tue, 20-Jan-2015 12:00:21 GMT; path=/; domain=.google.co.id; HttpOnly';
-            // Sehingga, cara agar karakter comma tersebut hilang, maka
-            // kita mengganti nilai expires dalam bentuk string, menjadi angka UNIX.
-            $url = $this->getUrl();
-            $parse_url = $this->parse_url;
-            $set_cookie = $this->result->headers['set-cookie'];
-            preg_match_all('/expires=([^;]*);/', $set_cookie, $match, PREG_SET_ORDER);
-            if (!empty($match)) {
-                foreach ($match as $value) {
-                    if (isset($value[0]) && isset($value[1])) {
-                        $time = strtotime($value[1]);
-                        $new = str_replace($value[1], $time, $value[0]);
-                        $set_cookie = str_replace($value[0], $new, $set_cookie);
-                    }
-                }
-            }
-            // Setelah karakter comma hilang, sekarang barulah kita explode.
-            $cookies = explode(',', $set_cookie);
-            foreach ($cookies as $cookie) {
-                preg_match_all('/(\w+)=([^;]*)/', $cookie, $parts, PREG_SET_ORDER);
-                // print_r($parts);
-                $first = array_shift($parts);
-                $data = array(
-                    'name' => $first[1],
-                    'value' => $first[2],
-                    'created' => microtime(TRUE),
-                );
-                foreach ($parts as $part) {
-                    $key = strtolower($part[1]);
-                    $data[$key] = $part[2];
-                }
-                // default
-                $data += array(
-                    'domain' => $parse_url['host'],
-                    'path' => '/',
-                    'expires' => NULL,
-                    'httponly' => preg_match('/HttpOnly/i', $cookie) ? TRUE : FALSE,
-                    'secure' => FALSE,
-                );
-                // Update our original data with the default order.
-                $order = array_flip($this->_cookie_field());
-                $data = array_merge($order, $data);
-                // Save cookie.
-                $this->cookie->set($data);
-            }
-        }
-    }
-
-    // Retrieve cookie from file csv than set to header request.
-    protected function getCookie() {
-        if (empty($this->cookie) && !$this->initCookie()) {
-            return;
-        }
-        $cookies = $this->cookie->get($this->parse_url);
-        if (!empty($cookies)) {
-            $old = $this->headers('Cookie');
-            isset($old) or $old = '';
-            foreach($cookies as $cookie) {
-                if (!empty($old)) {
-                    $old .= '; ';
-                }
-                $old .= $cookie['name'] . '=' . $cookie['value'];
-            }
-            $this->headers('Cookie', $old);
-        }
-    }
-
-    protected function history() {
-        $filename = $this->getCwd() . DIRECTORY_SEPARATOR . $this->history_filename;
-        $request = $this->result->request;
-        $response = $this->result->headers_raw;
-        $content = '';
-        $content .= 'REQUEST:' . "\t";
-        $content .= preg_replace("/\r\n|\n|\r/", "\t", $request);
-        $content .= PHP_EOL;
-        $content .= 'RESPONSE:' . "\t";
-        $content .= implode("\t", $response);
-        $content .= PHP_EOL;
-        if ($this->options('cache_save')) {
-            $content .= 'CACHE:' . "\t";
-            $content .= $this->cache;
-            $content .= PHP_EOL;
-        }
-        $content .= PHP_EOL;
-        try {
-            if (@file_put_contents($filename, $content, FILE_APPEND) === FALSE) {
-                throw new Exception('Failed to write content to: "' . $this->filename . '".');
-            }
-        }
-        catch (Exception $e) {
-            $this->error[] = $e->getMessage();
-        }
-    }
-
-    protected function cache() {
-        if (empty($this->result->data)) {
-            return;
-        }
-        $basename = $this->cache_filename;
-        $directory = $this->getCwd();
-        $filename = $this->filename_uniquify($basename, $directory);
-        $content = $this->result->data;
-        try {
-            if (@file_put_contents($filename, $content) === FALSE) {
-                throw new Exception('Failed to write content to: "' . $this->filename . '".');
-            }
-            // Set a new name.
-            $this->cache = $filename;
-        }
-        catch (Exception $e) {
-            $this->error[] = $e->getMessage();
-        }
-    }
     // Source from Drupal 7's function file_create_filename().
-    private function filename_uniquify($basename, $directory) {
+    /**
+     * 
+     */
+    private function filenameUniquify($basename, $directory) {
         // Strip control characters (ASCII value < 32). Though these are allowed in
         // some filesystems, not many applications handle them well.
         $basename = preg_replace('/[\x00-\x1F]/u', '_', $basename);
@@ -486,83 +265,145 @@ class Engine
                 $destination = $directory . $separator . $name . '_' . $counter++ . $ext;
             } while (file_exists($destination));
         }
-
         return $destination;
     }
 
-    // Modify (add, edit, delete) of simple array in one function.
-    private function propertyArray($property, $args) {
-        if (!property_exists(__CLASS__, $property)) {
-            return;
+}
+
+
+/**
+ * Class dasar untuk melakukan request http.
+ * Seluruh hasil disimpan dalam property $result.
+ */
+class HTTPRequester
+{
+    /**
+     * Calling required traits.
+     */
+    use PropertyAgent;
+
+    /**
+     * The main URL to request http.
+     */
+    private $url;
+
+    /**
+     * The $url property can change anytime because of redirect,
+     * so we keep information about $original_url for reference.
+     */
+    public $original_url;
+
+    /**
+     * Property untuk menyimpan hasil fungsi parse_url() saat method setUrl()
+     * dijalankan. Berguna sebagai referensi, tanpa perlu mengulang.
+     */
+    public $parse_url;
+
+    /**
+     * Property untuk menyimpan error yang terjadi.
+     */
+    public $error = array();
+
+    /**
+     * Property untuk menyimpan options.
+     */
+    public $options = array(
+        'method' => 'GET',
+        'data' => NULL,
+        'max_redirects' => 3,
+        'timeout' => 30.0,
+        'context' => NULL,
+        'follow_location' => FALSE,
+        'proxy_server' => '',
+        'proxy_exceptions' => array('localhost', '127.0.0.1'),
+        'proxy_port' => 8080,
+        'proxy_username' => '',
+        'proxy_password' => '',
+        'proxy_user_agent' => '',
+    );
+
+    public $headers = array();
+
+    public $post = array();
+
+    /**
+     * Property untuk menyimpan object dari class Timer.
+     * Object ini berguna untuk menghitung waktu request.
+     */
+    var $timer;
+
+    /**
+     * Property untuk menyimpan object dari class ParseHTTP.
+     * Object ini adalah hasil dari browsing dari method execute();
+     */
+    var $result;
+
+    /**
+     * Init and prepare default value.
+     */
+    function __construct($url = NULL) {
+        // Set url.
+        if (!empty($url)) {
+            $this->setUrl($url);
         }
-        switch (count($args)) {
-            case 0:
-                // It means get all info {$property}.
-                return $this->{$property};
-                break;
-            case 1:
-                $variable = array_shift($args);
-                // If NULL, it means reset.
-                if (is_null($variable)) {
-                    $this->{$property} = array();
-                }
-                // If Array, it meanse replace all value with that array.
-                elseif (is_array($variable)) {
-                    $this->{$property} = $variable;
-                }
-                // Otherwise, it means get one info {$property} by key.
-                elseif (isset($this->{$property}[$variable])) {
-                    return $this->{$property}[$variable];
-                }
-                break;
-            case 2:
-                // It means set info option.
-                $key = array_shift($args);
-                $value = array_shift($args);
-                try {
-                    if ((is_string($key) || is_numeric($key)) === FALSE) {
-                        throw new Exception('Key of option must string or numeric.');
-                    }
-                    if ((is_array($value) || is_object($value)) === TRUE) {
-                        throw new Exception('Value of option cannot array or object.');
-                    }
-                    if (is_null($value)) {
-                        // It means delete.
-                        unset($this->{$property}[$key]);
-                    }
-                    else {
-                        $this->{$property}[$key] = $value;
-                    }
-                    // Kembalikan lagi object, agar bisa set banyak.
-                    return $this;
-                }
-                catch (Exception $e) {
-                    $this->error[] = $e->getMessage();
-                }
-                break;
+
+        // Prefered using curl.
+        $this->curl(TRUE);
+
+        // Default value.
+        $this->options('encoding', 'gzip, deflate');
+    }
+
+    /**
+     * Method untuk set url kedalam class.
+     * Verifikasi akan dilakukan saat set url.
+     */
+    public function setUrl($url) {
+        try {
+            $parse_url = parse_url($url);
+            if (!isset($parse_url['scheme'])) {
+                // Delete current url.
+                $this->url = null;
+                throw new \Exception('Scheme pada URL tidak diketahui: "' . $url . '".');
+            }
+            if (!in_array($parse_url['scheme'], array('http', 'https'))) {
+                // Delete current url.
+                $this->url = null;
+                throw new \Exception('Scheme pada URL hanya mendukung http atau https: "' . $url . '".');
+            }
+            if (!isset($parse_url['host'])) {
+                // Delete current url.
+                $this->url = null;
+                throw new \Exception('Host pada URL tidak diketahui: "' . $url . '".');
+            }
+            if (!isset($parse_url['path'])) {
+                // Untuk mencocokkan info pada cookie, maka path perlu ada,
+                // gunakan nilai default.
+                $parse_url['path'] = '/';
+            }
+            // Set property $url and $original_url
+            // for now, we must not edit $original_url again.
+            $this->url = $url;
+            if (!isset($this->original_url)) {
+                $this->original_url = $url;
+            }
+            $this->parse_url = $parse_url;
+
+            return $this;
+        }
+        catch (\Exception $e) {
+            $this->error[] = $e->getMessage();
         }
     }
 
-    // CRUD of property $options.
-    public function options() {
-        $args = func_get_args();
-        return $this->propertyArray('options', $args);
+    public function getUrl() {
+        return $this->url;
     }
 
-    // CRUD of property $headers.
-    public function headers() {
-        $args = func_get_args();
-        return $this->propertyArray('headers', $args);
-    }
-
-    // CRUD of property $headers.
-    public function post() {
-        $args = func_get_args();
-        return $this->propertyArray('post', $args);
-    }
-
-    // Switch if you want use curl as driver to request HTTP.
-    // Curl support to compressed response.
+    /**
+     * Switch if you want use curl library as driver to request HTTP.
+     * Curl support to compressed response.
+     */
     public function curl($switch = TRUE) {
         if ($switch && function_exists('curl_init')) {
             $this->curl = TRUE;
@@ -573,66 +414,97 @@ class Engine
         return $this;
     }
 
-    public static function getResult($url) {
-        $b = new browser($url);
-        return $b->browse();
+    /**
+     * Method for retrieve and update property $options.
+     */
+    public function options() {
+        return $this->propertyAgent('options', func_get_args());
     }
-    // Main function.
-    public function browse($url = NULL) {
+
+    /**
+     * Method for retrieve and update property $options.
+     */
+    public function headers() {
+        return $this->propertyAgent('headers', func_get_args());
+    }
+
+    /**
+     * Method for retrieve and update property $options.
+     */
+    public function post() {
+        return $this->propertyAgent('post', func_get_args());
+    }
+
+    /**
+     * Main function to browse the URL setted.
+     */
+    public function execute($url = NULL) {
+
+        /**
+         * Mandatory property.
+         */
         if (isset($url)) {
-            $this->setUrl($url);            
+            $this->setUrl($url);
         }
         if (!isset($this->timer)) {
             $this->timer = new timer;
         }
-        // URL is required.
         $url = $this->getUrl();
         if (empty($url)) {
             $this->error[] = 'URL not set yet, request canceled.';
-            return;
-        }
-        // Current working directory is required.
-        if (!isset($this->cwd)) {
-            $this->error[] = 'Current Working Directory not set yet, request canceled.';
-            return;
-        }
-        // Use default option.
-        $this->options($this->options() + $this->_default_options());
-
-        // Retrieve cookie.
-        if ($this->options('cookie_retrieve')) {
-            $this->getCookie();
+            return $this;
         }
 
-        // Browse.
-        $this->result = $this->_browse();
+        // Browsing.
+        $this->preExecute();
+        $this->result = $this->_execute();
+        $this->postExecute();
 
-        // Save cookie.
-        if ($this->options('cookie_save')) {
-            $this->setCookie();
-        }
-
-        // Save cache.
-        if ($this->options('cache_save')) {
-            $this->cache();
-        }
-
-        // Save history.
-        if ($this->options('history_save')) {
-            $this->history();
-        }
-
-        // Save info error.
+        // Operation Error.
         if (isset($this->result->error)) {
             $this->error[] = $this->result->error;
         }
 
         // Follow location.
         if ($this->options('follow_location')) {
-            switch ($this->result->code) {
-                case 301: // Moved permanently
-                case 302: // Moved temporarily
-                case 307: // Moved temporarily
+            $this->followLocation();
+        }
+
+
+        return $this;
+
+    }
+    /**
+     *
+     */
+    protected function _execute() {
+        $method = $this->curl ? 'requesterCurl' : 'requesterStream';
+        return $this->{$method}();
+    }
+
+    /**
+     * Digunakan oleh class extends.
+     */
+    protected function preExecute() {
+
+    }
+
+    /**
+     * Digunakan oleh class extends.
+     */
+    protected function postExecute() {
+
+    }
+
+
+    /**
+     * Mengambil tugas jika ternyata opsi follow location diset true.
+     */
+    private function followLocation() {
+        switch ($this->result->code) {
+            case 301: // Moved permanently
+            case 302: // Moved temporarily
+            case 307: // Moved temporarily
                 $location = $this->result->headers['location'];
                 // Jika location baru hanya path, maka ubah menjadi full url.
                 if (preg_match('/^\//',$location)) {
@@ -657,30 +529,149 @@ class Engine
                     // And last, we must replace an new URL.
                     $this->setUrl($location);
                     // Browse again.
-                    return $this->browse();
+                    return $this->execute();
                 }
+                break;
+        }
+    }
+
+    /**
+     * Request HTTP using curl library.
+     * Curl set to not following redirect (location header response)
+     * because we must handle set-cookie and save history.
+     * Redirect is handle outside curl.
+     */
+    protected function requesterCurl() {
+        $url = $this->getUrl();
+        $uri = $this->parse_url;
+        $options = $this->options();
+        $headers = $this->headers();
+        $post = $this->post();
+
+        // Start curl.
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+        curl_setopt($ch, CURLOPT_HEADER, TRUE);
+
+        // Set post.
+        if (!empty($post)) {
+            // Add a new info of headers.
+            $headers['Content-Type'] = 'multipart/form-data';
+            // $headers['Content-Type'] = 'application/x-www-form-urlencoded';
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+        }
+
+        // Support proxy.
+        $proxy_server = $this->options('proxy_server');
+        $proxy_exceptions = $this->options('proxy_exceptions');
+        $is_host_not_proxy_exceptions = !in_array(strtolower($uri['host']), $proxy_exceptions, TRUE);
+        if ($proxy_server && $is_host_not_proxy_exceptions) {
+            curl_setopt($ch, CURLOPT_PROXY, $proxy_server);
+            $proxy_port = $this->options('proxy_port');
+            empty($proxy_port) or curl_setopt($ch, CURLOPT_PROXYPORT, $proxy_port);
+            if ($proxy_username = $this->options('proxy_username')) {
+                $proxy_password = $this->options('proxy_password');
+                $auth = $proxy_username . (!empty($proxy_password) ? ":" . $proxy_password : '');
+                curl_setopt($ch, CURLOPT_PROXYUSERPWD, $auth);
+            }
+            // Add a new info of headers.
+            $headers['Expect'] = ''; // http://stackoverflow.com/questions/6244578/curl-post-file-behind-a-proxy-returns-error
+        }
+
+        // CURL Options.
+        foreach ($options as $option => $value) {
+            switch ($option) {
+                case 'timeout':
+                    curl_setopt($ch, CURLOPT_TIMEOUT, $value);
+                    break;
+
+                case 'referer':
+                    curl_setopt($ch, CURLOPT_REFERER, $value);
+                    break;
+
+                case 'encoding':
+                    curl_setopt($ch, CURLOPT_ENCODING, $value);
+                    break;
             }
         }
-
-        // We must set return so user can playing with ParseHttp object.
-        return $this->result;
-    }
-
-    protected function _browse() {
-        $method = $this->curl ? 'curl_request' : 'drupal_http_request';
-        switch ($method) {
-            case 'curl_request':
-                return $this->{$method}();
-
-            case 'drupal_http_request':
-            default:
-                return $this->{$method}();
+        // HTTPS.
+        if ($uri['scheme'] == 'https') {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
         }
+
+        // Set header.
+        $_ = array();
+        foreach ($headers as $header => $value) {
+            $_[] = $header . ': ' . $value;
+        }
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $_);
+        // Set URL.
+        curl_setopt($ch, CURLOPT_URL, $url);
+
+        curl_setopt($ch, CURLINFO_HEADER_OUT, TRUE);
+        $response = curl_exec($ch);
+        $info = curl_getinfo($ch);
+        // echo "\r\n-----------------\r\n";
+        // print_r($response);
+
+        // $parse = preg_split("/\r\n\r\n|\n\n|\r\r/", $response);
+        // if (count($parse) > 2) {
+            // Kita asumsikan bahwa message HTTP adalah yang berada paling bawah
+            // dan header yang paling faktual adalah header sebelumnya.
+            // $this->data = array_pop($parse);
+            // $response = array_pop($parse);
+        // }
+        // else {
+            // list($response, $this->data) = $parse;
+        // }
+        // echo '$response';
+        // print_r($response);
+        // echo '$this->data';
+        // print_r($this->data);
+
+
+        // print_r($info);
+        // $result_header = substr($response, 0, $info['header_size']);
+        // $result_body = substr($response, $info['header_size']);
+        // var_dump($result_header);
+        // var_dump($result_body);
+        // echo "\r\n-----------------\r\n";
+        $error = curl_errno($ch);
+        curl_close($ch);
+        $result = new ParseHttp;
+        // $info is passing by curl.
+        if (isset($info['request_header'])) {
+            $result->request = $info['request_header'];
+        }
+        if ($error === 0) {
+            $result->parse($response);
+        }
+        else {
+            $result->code = -1;
+            switch ($error) {
+                case 6:
+                    $result->error = 'cannot resolve host';
+                    break;
+
+                case 28:
+                    $result->error = 'request timed out';
+                    break;
+
+                default:
+                    $result->error = 'error occured';
+                    break;
+            }
+        }
+        return $result;
     }
 
-    // Request HTTP modified of function drupal_http_request in Drupal 7.
-    // Some part is in this method, another part is in Parse HTTP class.
-    protected function drupal_http_request() {
+    /**
+     * Request HTTP using stream.
+     * This method is modified from function drupal_http_request in Drupal 7.
+     */
+    protected function requesterStream() {
         $result = new ParseHttp;
         $url = $this->getUrl();
         $uri = $this->parse_url;
@@ -701,12 +692,12 @@ class Engine
             $headers['Content-Type'] = 'application/x-www-form-urlencoded';
             $options['method'] = 'POST';
             // $options['data'] = http_build_query($post);
-            $options['data'] = $this->drupal_http_build_query($post);
+            $options['data'] = self::drupal_http_build_query($post);
         }
 
         // Support proxy.
-        $proxy_server = $this->getState('proxy_server', '');
-        $proxy_exceptions = $this->getState('proxy_exceptions', array('localhost', '127.0.0.1'));
+        $proxy_server = $this->options('proxy_server');
+        $proxy_exceptions = $this->options('proxy_exceptions');
         $is_host_not_proxy_exceptions = !in_array(strtolower($uri['host']), $proxy_exceptions, TRUE);
         if ($proxy_server && $is_host_not_proxy_exceptions) {
             // Set the scheme so we open a socket to the proxy server.
@@ -716,13 +707,13 @@ class Engine
             // Since the URL is passed as the path, we won't use the parsed query.
             unset($uri['query']);
             // Add in username and password to Proxy-Authorization header if needed.
-            if ($proxy_username = $this->getState('proxy_username', '')) {
-                $proxy_password = $this->getState('proxy_password', '');
+            if ($proxy_username = $this->options('proxy_username')) {
+                $proxy_password = $this->options('proxy_password');
                 $headers['Proxy-Authorization'] = 'Basic ' . base64_encode($proxy_username . (!empty($proxy_password) ? ":" . $proxy_password : ''));
             }
             // Some proxies reject requests with any User-Agent headers, while others
             // require a specific one.
-            $proxy_user_agent = $this->getState('proxy_user_agent', '');
+            $proxy_user_agent = $this->options('proxy_user_agent');
             // The default value matches neither condition.
             if ($proxy_user_agent === NULL) {
                 unset($headers['User-Agent']);
@@ -735,7 +726,7 @@ class Engine
         switch ($uri['scheme']) {
             case 'proxy':
                 // Make the socket connection to a proxy server.
-                $socket = 'tcp://' . $proxy_server . ':' . $this->getState('proxy_port', 8080);
+                $socket = 'tcp://' . $proxy_server . ':' . $this->options('proxy_port');
                 // The Host header still needs to match the real request.
                 $headers['Host'] = $uri['host'];
                 $headers['Host'] .= isset($uri['port']) && $uri['port'] != 80 ? ':' . $uri['port'] : '';
@@ -845,7 +836,10 @@ class Engine
         return $result;
     }
 
-    protected function drupal_http_build_query(array $query, $parent = '') {
+    /**
+     * Function from Drupal 7, drupal_http_build_query().
+     */
+    protected static function httpBuildQuery(array $query, $parent = '') {
         $params = array();
 
         foreach ($query as $key => $value) {
@@ -853,7 +847,7 @@ class Engine
 
             // Recurse into children.
             if (is_array($value)) {
-                $params[] = drupal_http_build_query($value, $key);
+                $params[] = self::httpBuildQuery($value, $key);
             }
             // If a query parameter value is NULL, only append its key.
             elseif (!isset($value)) {
@@ -868,181 +862,329 @@ class Engine
         return implode('&', $params);
     }
 
-    // Request HTTP using curl library.
-    // Curl set to not following redirect (location header response)
-    // because we must handle set-cookie and save history.
-    // Redirect is handle outside curl.
-    protected function curl_request() {
-        $url = $this->getUrl();
-        $uri = $this->parse_url;
-        $options = $this->options();
-        $headers = $this->headers();
-        $post = $this->post();
-
-        // Start curl.
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
-        curl_setopt($ch, CURLOPT_HEADER, TRUE);
-
-        // Set post.
-        if (!empty($post)) {
-            // Add a new info of headers.
-            $headers['Content-Type'] = 'multipart/form-data';
-            // $headers['Content-Type'] = 'application/x-www-form-urlencoded';
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
-        }
-
-        // Support proxy.
-        $proxy_server = $this->getState('proxy_server', '');
-        $proxy_exceptions = $this->getState('proxy_exceptions', array('localhost', '127.0.0.1'));
-        $is_host_not_proxy_exceptions = !in_array(strtolower($uri['host']), $proxy_exceptions, TRUE);
-        if ($proxy_server && $is_host_not_proxy_exceptions) {
-            curl_setopt($ch, CURLOPT_PROXY, $proxy_server);
-            $proxy_port = $this->getState('proxy_port', 8080);
-            empty($proxy_port) or curl_setopt($ch, CURLOPT_PROXYPORT, $proxy_port);
-            if ($proxy_username = $this->getState('proxy_username', '')) {
-                $proxy_password = $this->getState('proxy_password', '');
-                $auth = $proxy_username . (!empty($proxy_password) ? ":" . $proxy_password : '');
-                curl_setopt($ch, CURLOPT_PROXYUSERPWD, $auth);
-            }
-            // Add a new info of headers.
-            $headers['Expect'] = ''; // http://stackoverflow.com/questions/6244578/curl-post-file-behind-a-proxy-returns-error
-        }
-
-        // CURL Options.
-        foreach ($options as $option => $value) {
-            switch ($option) {
-                case 'timeout':
-                    curl_setopt($ch, CURLOPT_TIMEOUT, $value);
-                    break;
-
-                case 'referer':
-                    curl_setopt($ch, CURLOPT_REFERER, $value);
-                    break;
-
-                case 'encoding':
-                    curl_setopt($ch, CURLOPT_ENCODING, $value);
-                    break;
-            }
-        }
-        // HTTPS.
-        if ($uri['scheme'] == 'https') {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
-        }
-
-        // Set header.
-        $_ = array();
-        foreach ($headers as $header => $value) {
-            $_[] = $header . ': ' . $value;
-        }
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $_);
-        // Set URL.
-        curl_setopt($ch, CURLOPT_URL, $url);
-
-        curl_setopt($ch, CURLINFO_HEADER_OUT, TRUE);
-        $response = curl_exec($ch);
-        $info = curl_getinfo($ch);
-        // echo "\r\n-----------------\r\n";
-        // print_r($response);
-
-        // $parse = preg_split("/\r\n\r\n|\n\n|\r\r/", $response);
-        // if (count($parse) > 2) {
-            // Kita asumsikan bahwa message HTTP adalah yang berada paling bawah
-            // dan header yang paling faktual adalah header sebelumnya.
-            // $this->data = array_pop($parse);
-            // $response = array_pop($parse);
-        // }
-        // else {
-            // list($response, $this->data) = $parse;
-        // }
-        // echo '$response';
-        // print_r($response);
-        // echo '$this->data';
-        // print_r($this->data);
-
-
-        // print_r($info);
-        // $result_header = substr($response, 0, $info['header_size']);
-        // $result_body = substr($response, $info['header_size']);
-        // var_dump($result_header);
-        // var_dump($result_body);
-        // echo "\r\n-----------------\r\n";
-        $error = curl_errno($ch);
-        curl_close($ch);
-        $result = new ParseHttp;
-        // $info is passing by curl.
-        if (isset($info['request_header'])) {
-            $result->request = $info['request_header'];
-        }
-        if ($error === 0) {
-            $result->parse($response);
-        }
-        else {
-            $result->code = -1;
-            switch ($error) {
-                case 6:
-                    $result->error = 'cannot resolve host';
-                    break;
-
-                case 28:
-                    $result->error = 'request timed out';
-                    break;
-
-                default:
-                    $result->error = 'error occured';
-                    break;
-            }
-        }
-        return $result;
-    }
-
-    // Get random user agent.
-    public function getUserAgent($options) {
-        // todo:
-        if ($options['mobile'] && $options['mobile'] == TRUE) {
-            // cari disini.
-        }
-        return 'Mozilla/5.0 (iPhone; U; CPU iPhone OS 3_0 like Mac OS X; en-us) AppleWebKit/528.18 (KHTML, like Gecko) Version/4.0 Mobile/7A341 Safari/528.16';
-    }
-    
-    // Reference of field of cookie.
-    private function _cookie_field() {
-        return array(
-            'domain',
-            'path',
-            'name',
-            'value',
-            'expires',
-            'httponly',
-            'secure',
-            'created',
-        );
-    }
-
-    // Reference of default options.
-    private function _default_options() {
-        return array(
-            'method' => 'GET',
-            'data' => NULL,
-            'max_redirects' => 3,
-            'timeout' => 30.0,
-            'context' => NULL,
-            'cookie_retrieve' => FALSE,
-            'cookie_save' => FALSE,
-            'cache_save' => FALSE,
-            'history_save' => FALSE,
-            'follow_location' => FALSE,
-        );
-    }
 }
 
-class Timer 
+/**
+ * Class browser.
+ *
+ * Extends dari HTTPRequester dengan menambah fitur-fitur seperti layaknya
+ * sebuah browser.
+ *
+ * Fitur tersedia:
+ *  - Save HTML sebagai cache
+ *  - Cookie
+ *  - History Log
+ *  - Berbagai fungsi static untuk keperluan cepat (shortcut).
+ */
+class Browser extends HTTPRequester
 {
+
+    /**
+     * Load berbagai method terkait direktori.
+     */
+    use FileSystem;
+
+
+
+    /**
+     * Property untuk menyimpan object dari Cookies.
+     * Object ini adalah instance dari class ParseCSV.
+     */
+    protected $cookie_object;
+
+    /**
+     * todo
+     */
+    protected $cookie_filename = 'cookie.csv';
+
+    /**
+     * Reference of field of cookie.
+     */
+    protected $cookie_field = ['domain', 'path', 'name', 'value', 'expires', 'httponly', 'secure', 'created'];
     
+    protected $history_filename = 'history.log';
+    
+    protected $cache_filename = 'cache.html';
+    
+    protected $cache_filename_current;
+
+
+    function __construct($url = NULL) {
+
+        // Execute Parent.
+        parent::__construct($url);
+
+        // Tambah nilai default dari property $options
+        $added_options = array(
+            // Send cookie to the site when request.
+            'cookie_send' => FALSE,
+            // Accept delivery of site's cookie.
+            'cookie_receive' => FALSE,
+            // todo doc.
+            'cache_save' => FALSE,
+            // todo doc.
+            'history_save' => FALSE,
+        );
+        $this->options($this->options() + $added_options);
+
+
+
+    }
+
+    protected function preExecute() {
+        if ($this->options('cookie_send')) {
+            $this->cookieRead();
+        }
+    }
+
+    protected function postExecute() {
+        if ($this->options('cookie_receive')) {
+            $this->cookieWrite();
+        }
+        if ($this->options('cache_save')) {
+            $this->cacheSave();
+        }
+        if ($this->options('history_save')) {
+            $this->historySave();
+        }
+    }
+
+    /**
+     * Memulai melakukan instance dari class parseCSV.
+     * Menyimpan hasilnya di property $cookie.
+     */
+    protected function cookieInit($autocreate = FALSE) {
+        try {            
+            if (!isset($this->cwd)) {
+                throw new \Exception('Current Working Directory not set yet.');
+            }            
+            $filename = $this->cwd . DIRECTORY_SEPARATOR . $this->cookie_filename;
+            if (!file_exists($filename) && !$autocreate) {
+                return FALSE;
+            }
+            
+            $create = FALSE;
+            if (!file_exists($filename)) {
+                $create = TRUE;
+            }
+            else {
+                $size = filesize($filename);
+                if (empty($size)) {
+                    $create = TRUE;
+                    // Perlu di clear info filesize
+                    // atau error saat eksekusi parent::_rfile().
+                    // @see: http://php.net/filesize > Notes.
+                    clearstatcache(TRUE, $filename);
+                }
+            }
+            if ($create) {
+                $header = implode(',', $this->cookie_field);
+                file_put_contents($filename, $header . PHP_EOL);
+            }
+            if (!file_exists($filename)) {
+                throw new \Exception('Failed to create cookie file, build Cookie canceled: "' . $filename . '".');
+            }
+
+            // Build object.
+            // Jangan masukkan $filename sebagai argument saat calling parseCSV,
+            // agar tidak dilakukan parsing. Parsing hanya dilakukan saat melakukan
+            // method get.
+            $this->cookie_object = new \parseCSV;
+            $this->cookie_object->file = $filename;
+
+            // Wajib mengembalikan TRUE.
+            // lihat pada method cookieWrite dan cookieRead
+            return TRUE;
+        }
+        catch (\Exception $e) {
+            $this->error[] = $e->getMessage();
+        }
+    }
+
+    /**
+     * Write info "Set-Cookie" from response header to storage of cookie.
+     * We use CSV file for storage.
+     */
+    protected function cookieWrite() {
+        if (empty($this->cookie_object) && !$this->cookieInit(TRUE)) {
+            return;
+        }
+        if (!isset($this->result->headers['set-cookie'])) {
+            return;
+        }
+        $url = $this->getUrl();
+        $parse_url = $this->parse_url;
+        $set_cookies = (array) $this->result->headers['set-cookie'];
+        $rows = array();
+        foreach ($set_cookies as $set_cookie) {
+            preg_match_all('/(\w+)=([^;]*)/', $set_cookie, $parts, PREG_SET_ORDER);
+            // print_r($parts);
+            $first = array_shift($parts);
+            $data = array(
+                'name' => $first[1],
+                'value' => $first[2],
+                'created' => microtime(TRUE),
+            );
+            foreach ($parts as $part) {
+                $key = strtolower($part[1]);
+                $data[$key] = $part[2];
+            }
+            // default
+            $data += array(
+                'domain' => $parse_url['host'],
+                'path' => '/',
+                'expires' => NULL,
+                'httponly' => preg_match('/HttpOnly/i', $set_cookie) ? TRUE : FALSE,
+                'secure' => FALSE,
+            );
+            // Convert expires from Wdy, DD-Mon-YYY HH:MM:SS GMT
+            // to unix time stamp
+            if (!empty($data['expires'])) {
+                $data['expires'] = $data['expires'];
+            }
+            // Update our original data with the default order.
+            $order = array_flip($this->cookie_field);
+            $data = array_merge($order, $data);
+            $rows[] = $data;
+        }
+        // Save cookie, append to the file CSV.
+        $this->cookie_object->save(NULL, $rows, true);
+    }
+
+    /**
+     * Read info cookie about domain from storage, and set to request heeader.
+     * We use CSV file for storage.
+     */
+    protected function cookieRead() {
+        if (empty($this->cookie_object) && !$this->cookieInit()) {
+            return;
+        }
+        // Parse csv now.
+        $this->cookie_object->parse();
+        // Get result.
+        $data = $this->cookie_object->data;
+        // $debugname = 'data'; echo 'var_dump(' . $debugname . '): '; var_dump($$debugname);
+
+        $parse_url = $this->parse_url;
+        // Lakukan filtering data.
+        $storage = array();
+        foreach($data as $key => $row) {
+            // Filter domain.
+            $domain_match = FALSE;
+            if (substr($row['domain'], 0, 1) == '.') {
+                $string = preg_quote(substr($row['domain'], 1), '/');
+                if (preg_match('/.*' . $string . '/i', $parse_url['host'])) {
+                  $domain_match = TRUE;
+                }
+            }
+            elseif ($row['domain'] == $parse_url['host']) {
+                $domain_match = TRUE;
+            }
+            if (!$domain_match) {
+                continue;
+            }
+            // Filter path.
+            $path_match = FALSE;
+            $string = preg_quote($row['path'], '/');
+            if (preg_match('/^' . $string . '/i', $parse_url['path'])) {
+                $path_match = TRUE;
+            }
+            if (!$path_match) {
+                continue;
+            }
+            // Filter expires.
+            $is_expired = TRUE;
+            if (empty($row['expires'])) {
+                $is_expired = FALSE;
+            }
+            elseif (time() < strtotime($row['expires'])) {
+                $is_expired = FALSE;
+            }
+            if ($is_expired) {
+                continue;
+            }
+            // Filter duplikat dengan mengambil cookie yang paling baru.
+            if (isset($storage[$row['name']]) && $storage[$row['name']]['created'] > $row['created']) {
+                continue;
+            }
+            // Finish.
+            $storage[$row['name']] = $row;
+        }
+
+        if (!empty($storage)) {
+            $old = $this->headers('Cookie');
+            isset($old) or $old = '';
+            foreach($storage as $cookie) {
+                if (!empty($old)) {
+                    $old .= '; ';
+                }
+                $old .= $cookie['name'] . '=' . $cookie['value'];
+            }
+            $this->headers('Cookie', $old);
+        }
+    }
+
+    protected function cacheSave() {
+        if (empty($this->result->data)) {
+            return;
+        }
+        $basename = $this->cache_filename;
+        $directory = $this->getCwd();
+        $filename = $this->filenameUniquify($basename, $directory);
+        $debugvariable = 'basename'; $debugfile = 'debug.html'; ob_start(); echo "<pre>\r\n". 'var_dump(' . $debugvariable . '): '; var_dump($$debugvariable); echo "</pre>\r\n"; $debugoutput = ob_get_contents(); ob_end_clean(); file_put_contents($debugfile, $debugoutput, FILE_APPEND);
+        $debugvariable = 'filename'; $debugfile = 'debug.html'; ob_start(); echo "<pre>\r\n". 'var_dump(' . $debugvariable . '): '; var_dump($$debugvariable); echo "</pre>\r\n"; $debugoutput = ob_get_contents(); ob_end_clean(); file_put_contents($debugfile, $debugoutput, FILE_APPEND);
+        
+        
+        $content = $this->result->data;
+        
+        
+        try {
+            if (@file_put_contents($filename, $content) === FALSE) {
+                throw new Exception('Failed to write content to: "' . $this->filename . '".');
+            }
+            // Set a new name.
+            $this->cache_filename_current = $filename;
+        }
+        catch (Exception $e) {
+            $this->error[] = $e->getMessage();
+        }
+    }
+
+    /**
+     * todo.
+     */
+    protected function historySave() {
+        $filename = $this->getCwd() . DIRECTORY_SEPARATOR . $this->history_filename;
+        $content = '';
+        !isset($this->result->request) or $content .= 'REQUEST:' . "\t" . preg_replace("/\r\n|\n|\r/", "\t", $this->result->request) . PHP_EOL;
+        !isset($this->result->headers_raw) or $content .= 'RESPONSE:' . "\t" . implode("\t", $this->result->headers_raw) . PHP_EOL;
+        if ($this->options('cache_save')) {
+            $content .= 'CACHE:' . "\t" . $this->cache_filename_current . PHP_EOL;
+        }
+        $content .= PHP_EOL;
+        try {
+            if (@file_put_contents($filename, $content, FILE_APPEND) === FALSE) {
+                throw new Exception('Failed to write content to: "' . $filename . '".');
+            }
+        }
+        catch (Exception $e) {
+            $this->error[] = $e->getMessage();
+        }
+    }
+
+
+    // function __destruct() {
+        // $now = time();
+        // file_put_contents($now, 'a');
+    // }
+
+}
+
+class Timer
+{
+
     var $count_down;
-    
+
     function __construct($count_down = NULL) {
         if (is_int($count_down)) {
             $this->count_down = $count_down;
@@ -1060,11 +1202,15 @@ class Timer
     // check count down.
     // return sisa waktu
     function countdown() {
-        return round($this->count_down - ($this->read() / 1000));    
+        return round($this->count_down - ($this->read() / 1000));
     }
 }
 
-class ParseHttp 
+/**
+ * Class for parsing response of HTTP.
+ * This class is modified from function drupal_http_request in Drupal 7.
+ */
+class ParseHttp
 {
 
     // Property of this class is following the $result object,
@@ -1105,30 +1251,49 @@ class ParseHttp
         list($header, $data) = preg_split("/\r\n\r\n|\n\n|\r\r/", $response, 2);
         // Antisipasi kasus diatas.
         if (strpos($data, 'HTTP') === 0) {
-            list($header, $data) = preg_split("/\r\n\r\n|\n\n|\r\r/", $data, 2);  
+            list($header, $data) = preg_split("/\r\n\r\n|\n\n|\r\r/", $data, 2);
         }
-        $this->data = $data;   
+        $this->data = $data;
         $response = preg_split("/\r\n|\n|\r/", $header);
         // Parse the response status line.
         list($protocol, $code, $status_message) = explode(' ', trim(array_shift($response)), 3);
         $this->protocol = $protocol;
         $this->status_message = $status_message;
 
-        $this->headers = array();
-        $this->headers_raw = $response;
         // Parse the response headers.
+        $this->headers = array();
+        // Keep original response header.
+        $this->headers_raw = $response;
         while ($line = trim(array_shift($response))) {
             list($name, $value) = explode(':', $line, 2);
             $name = strtolower($name);
-            if (isset($this->headers[$name]) && $name == 'set-cookie') {
-                // RFC 2109: the Set-Cookie response header comprises the token Set-
-                // Cookie:, followed by a comma-separated list of one or more cookies.
-                $this->headers[$name] .= ',' . trim($value);
+            // Pada fungsi drupal drupal_http_request(), digunakan informasi
+            // seperti ini:
+            // RFC 2109: the Set-Cookie response header comprises the token Set-
+            // Cookie:, followed by a comma-separated list of
+            // one or more cookies.
+            if (isset($this->headers[$name])) {
+                if (is_array($this->headers[$name])) {
+                    $this->headers[$name][] = trim($value);
+                }
+                else {
+                    $this->headers[$name] = array(
+                        $this->headers[$name],
+                        trim($value),
+                    );
+                }
             }
             else {
                 $this->headers[$name] = trim($value);
             }
+            // if (isset($this->headers[$name]) && $name == 'set-cookie') {
+                // $this->headers[$name] .= ',' . trim($value);
+            // }
+            // else {
+                // $this->headers[$name] = trim($value);
+            // }
         }
+
         $responses = array(
             100 => 'Continue',
             101 => 'Switching Protocols',
@@ -1182,4 +1347,12 @@ class ParseHttp
     public function parse_curl() {
 
     }
+
+    /**
+     * Memecah informasi pada header yang mana menggunakan pola titik koma.
+     */
+    public function header_explode() {
+
+    }
 }
+
