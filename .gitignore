@@ -2,8 +2,13 @@ debug.html
 test.php
 test2.php
 demo.php
+<<<<<<< HEAD
 TODO.md
 cookie.csv
 history.log
 cache.html
 cache_*.html
+=======
+
+/vendor/
+>>>>>>> 2066498a832930fb6a4acecf2960170b28576535
