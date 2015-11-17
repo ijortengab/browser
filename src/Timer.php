@@ -1,10 +1,9 @@
 <?php
-namespace IjorTengab\Browser;  
+namespace IjorTengab\Browser;
 
 class Timer
 {
-
-    var $count_down;
+    public $count_down;
 
     function __construct($count_down = NULL) {
         if (is_int($count_down)) {
@@ -12,6 +11,7 @@ class Timer
         }
         $this->start = microtime(TRUE);
     }
+
     function read() {
         $stop = microtime(TRUE);
         $diff = round(($stop - $this->start) * 1000, 2);
@@ -20,8 +20,11 @@ class Timer
         }
         return $diff;
     }
-    // check count down.
-    // return sisa waktu
+
+    /**
+     * Check count down.
+     * @return sisa waktu
+     */
     function countdown() {
         return round($this->count_down - ($this->read() / 1000));
     }

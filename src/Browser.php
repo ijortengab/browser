@@ -21,8 +21,6 @@ class Browser extends HTTPRequester
      */
     use FileSystemTrait;
 
-
-
     /**
      * Property untuk menyimpan object dari Cookies.
      * Object ini adalah instance dari class ParseCSV.
@@ -30,7 +28,7 @@ class Browser extends HTTPRequester
     protected $cookie_object;
 
     /**
-     * todo
+     * Nama file untuk penyimpanan data cookie.
      */
     protected $cookie_filename = 'cookie.csv';
 
@@ -38,20 +36,29 @@ class Browser extends HTTPRequester
      * Reference of field of cookie.
      */
     protected $cookie_field = ['domain', 'path', 'name', 'value', 'expires', 'httponly', 'secure', 'created'];
-    
+
+    /**
+     * Nama file untuk penyimpanan data history.
+     */
     protected $history_filename = 'history.log';
-    
-    protected $cache_filename = 'cache.html';
-    
-    protected $cache_filename_current;
 
+    /**
+     * Nama file referensi untuk penyimpanan "message body" hasil request.
+     */
+    protected $_cache_filename = 'cache.html';
 
+    /**
+     * Nama file saat ini hasil dari penyimpanan "message body" hasil request.
+     */
+    protected $cache_filename;
+
+    /**
+     * Construct.
+     */
     function __construct($url = NULL) {
-
         // Execute Parent.
         parent::__construct($url);
-
-        // Tambah nilai default dari property $options
+        // Tambah nilai default dari property $options.
         $added_options = array(
             // Send cookie to the site when request.
             'cookie_send' => FALSE,
@@ -63,17 +70,20 @@ class Browser extends HTTPRequester
             'history_save' => FALSE,
         );
         $this->options($this->options() + $added_options);
-
-
-
     }
 
+    /**
+     * @inherit
+     */
     protected function preExecute() {
         if ($this->options('cookie_send')) {
             $this->cookieRead();
         }
     }
 
+    /**
+     * @inherit
+     */
     protected function postExecute() {
         if ($this->options('cookie_receive')) {
             $this->cookieWrite();
@@ -91,15 +101,14 @@ class Browser extends HTTPRequester
      * Menyimpan hasilnya di property $cookie.
      */
     protected function cookieInit($autocreate = FALSE) {
-        try {            
+        try {
             if (!isset($this->cwd)) {
                 throw new \Exception('Current Working Directory not set yet.');
-            }            
+            }
             $filename = $this->cwd . DIRECTORY_SEPARATOR . $this->cookie_filename;
             if (!file_exists($filename) && !$autocreate) {
                 return FALSE;
             }
-            
             $create = FALSE;
             if (!file_exists($filename)) {
                 $create = TRUE;
@@ -124,14 +133,14 @@ class Browser extends HTTPRequester
 
             // Build object.
             // Jangan masukkan $filename sebagai argument saat calling parseCSV,
-            // agar tidak dilakukan parsing. Parsing hanya dilakukan saat melakukan
-            // method get.
+            // agar tidak dilakukan parsing. Parsing hanya dilakukan saat 
+            // melakukan method get.
             $this->cookie_object = new \parseCSV;
             $this->cookie_object->file = $filename;
 
-            // Wajib mengembalikan TRUE.
+            // Wajib mengembalikan true.
             // lihat pada method cookieWrite dan cookieRead
-            return TRUE;
+            return true;
         }
         catch (\Exception $e) {
             $this->error[] = $e->getMessage();
@@ -143,7 +152,7 @@ class Browser extends HTTPRequester
      * We use CSV file for storage.
      */
     protected function cookieWrite() {
-        if (empty($this->cookie_object) && !$this->cookieInit(TRUE)) {
+        if (empty($this->cookie_object) && !$this->cookieInit(true)) {
             return;
         }
         if (!isset($this->result->headers['set-cookie'])) {
@@ -154,8 +163,7 @@ class Browser extends HTTPRequester
         $set_cookies = (array) $this->result->headers['set-cookie'];
         $rows = array();
         foreach ($set_cookies as $set_cookie) {
-            preg_match_all('/(\w+)=([^;]*)/', $set_cookie, $parts, PREG_SET_ORDER);
-            // print_r($parts);
+            preg_match_all('/(\w+)=([^;]*)/', $set_cookie, $parts, PREG_SET_ORDER);            
             $first = array_shift($parts);
             $data = array(
                 'name' => $first[1],
@@ -166,7 +174,7 @@ class Browser extends HTTPRequester
                 $key = strtolower($part[1]);
                 $data[$key] = $part[2];
             }
-            // default
+            // Default.
             $data += array(
                 'domain' => $parse_url['host'],
                 'path' => '/',
@@ -180,6 +188,7 @@ class Browser extends HTTPRequester
                 $data['expires'] = $data['expires'];
             }
             // Update our original data with the default order.
+            // Inspired from drupal menu function.
             $order = array_flip($this->cookie_field);
             $data = array_merge($order, $data);
             $rows[] = $data;
@@ -200,8 +209,6 @@ class Browser extends HTTPRequester
         $this->cookie_object->parse();
         // Get result.
         $data = $this->cookie_object->data;
-        // $debugname = 'data'; echo 'var_dump(' . $debugname . '): '; var_dump($$debugname);
-
         $parse_url = $this->parse_url;
         // Lakukan filtering data.
         $storage = array();
@@ -261,26 +268,27 @@ class Browser extends HTTPRequester
         }
     }
 
+    /**
+     * Menyimpan hasil request http berupa "message body" kedalam file text.
+     * Nama file hasil penyimpanan didapat dari property $_cache_filename
+     * dan akan dilakukan "rename" otomatis dengan suffix angka serial, dan
+     * "current filename" dapat diakses dari property $cache_filename.
+     */
     protected function cacheSave() {
         if (empty($this->result->data)) {
             return;
         }
-        $basename = $this->cache_filename;
+        $_filename = $this->_cache_filename;
         $directory = $this->getCwd();
-        $filename = $this->filenameUniquify($basename, $directory);
-        $debugvariable = 'basename'; $debugfile = 'debug.html'; ob_start(); echo "<pre>\r\n". 'var_dump(' . $debugvariable . '): '; var_dump($$debugvariable); echo "</pre>\r\n"; $debugoutput = ob_get_contents(); ob_end_clean(); file_put_contents($debugfile, $debugoutput, FILE_APPEND);
-        $debugvariable = 'filename'; $debugfile = 'debug.html'; ob_start(); echo "<pre>\r\n". 'var_dump(' . $debugvariable . '): '; var_dump($$debugvariable); echo "</pre>\r\n"; $debugoutput = ob_get_contents(); ob_end_clean(); file_put_contents($debugfile, $debugoutput, FILE_APPEND);
-        
-        
+        $filename = $this->fileNameUniquify($_filename, $directory);
+        // Saving.
         $content = $this->result->data;
-        
-        
         try {
             if (@file_put_contents($filename, $content) === FALSE) {
                 throw new Exception('Failed to write content to: "' . $this->filename . '".');
             }
-            // Set a new name.
-            $this->cache_filename_current = $filename;
+            // Save current filename.
+            $this->cache_filename = $filename;
         }
         catch (Exception $e) {
             $this->error[] = $e->getMessage();
@@ -288,7 +296,8 @@ class Browser extends HTTPRequester
     }
 
     /**
-     * todo.
+     * Menyimpan history request http. Berguna untuk "debugging". Mirip seperti
+     * file access.log pada web server.
      */
     protected function historySave() {
         $filename = $this->getCwd() . DIRECTORY_SEPARATOR . $this->history_filename;
@@ -296,7 +305,7 @@ class Browser extends HTTPRequester
         !isset($this->result->request) or $content .= 'REQUEST:' . "\t" . preg_replace("/\r\n|\n|\r/", "\t", $this->result->request) . PHP_EOL;
         !isset($this->result->headers_raw) or $content .= 'RESPONSE:' . "\t" . implode("\t", $this->result->headers_raw) . PHP_EOL;
         if ($this->options('cache_save')) {
-            $content .= 'CACHE:' . "\t" . $this->cache_filename_current . PHP_EOL;
+            $content .= 'CACHE:' . "\t" . $this->cache_filename . PHP_EOL;
         }
         $content .= PHP_EOL;
         try {
@@ -308,12 +317,4 @@ class Browser extends HTTPRequester
             $this->error[] = $e->getMessage();
         }
     }
-
-
-    // function __destruct() {
-        // $now = time();
-        // file_put_contents($now, 'a');
-    // }
-
 }
-

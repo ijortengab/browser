@@ -1,5 +1,5 @@
 <?php
-namespace IjorTengab\Browser;  
+namespace IjorTengab\Browser;
 
 /**
  * Class dasar untuk melakukan request http.
@@ -52,21 +52,27 @@ class HTTPRequester
         'proxy_user_agent' => '',
     );
 
+    /**
+     * Property untuk menyimpan data header saat request http.
+     */
     public $headers = array();
 
+    /**
+     * Property untuk menyimpan data post saat request http.
+     */
     public $post = array();
 
     /**
      * Property untuk menyimpan object dari class Timer.
      * Object ini berguna untuk menghitung waktu request.
      */
-    var $timer;
+    private $timer;
 
     /**
-     * Property untuk menyimpan object dari class ParseHTTP.
-     * Object ini adalah hasil dari browsing dari method execute();
+     * Property untuk menyimpan hasil requst http. Value adalah object dari
+     * instance class ParseHTTP.
      */
-    var $result;
+    public $result;
 
     /**
      * Init and prepare default value.
@@ -118,7 +124,6 @@ class HTTPRequester
                 $this->original_url = $url;
             }
             $this->parse_url = $parse_url;
-
             return $this;
         }
         catch (\Exception $e) {
@@ -169,7 +174,6 @@ class HTTPRequester
      * Main function to browse the URL setted.
      */
     public function execute($url = NULL) {
-
         /**
          * Mandatory property.
          */
@@ -199,13 +203,11 @@ class HTTPRequester
         if ($this->options('follow_location')) {
             $this->followLocation();
         }
-
-
         return $this;
-
     }
+
     /**
-     *
+     * Execute with preferred media.
      */
     protected function _execute() {
         $method = $this->curl ? 'requesterCurl' : 'requesterStream';
@@ -213,22 +215,19 @@ class HTTPRequester
     }
 
     /**
-     * Digunakan oleh class extends.
+     * Method dijalankan sebelum execute.
      */
     protected function preExecute() {
-
     }
 
     /**
-     * Digunakan oleh class extends.
+     * Method dijalankan sesudah execute.
      */
     protected function postExecute() {
-
     }
 
-
     /**
-     * Mengambil tugas jika ternyata opsi follow location diset true.
+     * Menjalankan fitur auto follow location.
      */
     private function followLocation() {
         switch ($this->result->code) {
@@ -291,7 +290,6 @@ class HTTPRequester
             curl_setopt($ch, CURLOPT_POST, 1);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
         }
-
         // Support proxy.
         $proxy_server = $this->options('proxy_server');
         $proxy_exceptions = $this->options('proxy_exceptions');
@@ -308,7 +306,6 @@ class HTTPRequester
             // Add a new info of headers.
             $headers['Expect'] = ''; // http://stackoverflow.com/questions/6244578/curl-post-file-behind-a-proxy-returns-error
         }
-
         // CURL Options.
         foreach ($options as $option => $value) {
             switch ($option) {
@@ -330,7 +327,6 @@ class HTTPRequester
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
         }
-
         // Set header.
         $_ = array();
         foreach ($headers as $header => $value) {
@@ -339,13 +335,11 @@ class HTTPRequester
         curl_setopt($ch, CURLOPT_HTTPHEADER, $_);
         // Set URL.
         curl_setopt($ch, CURLOPT_URL, $url);
-
         curl_setopt($ch, CURLINFO_HEADER_OUT, TRUE);
         $response = curl_exec($ch);
         $info = curl_getinfo($ch);
         // echo "\r\n-----------------\r\n";
         // print_r($response);
-
         // $parse = preg_split("/\r\n\r\n|\n\n|\r\r/", $response);
         // if (count($parse) > 2) {
             // Kita asumsikan bahwa message HTTP adalah yang berada paling bawah
@@ -360,8 +354,6 @@ class HTTPRequester
         // print_r($response);
         // echo '$this->data';
         // print_r($this->data);
-
-
         // print_r($info);
         // $result_header = substr($response, 0, $info['header_size']);
         // $result_body = substr($response, $info['header_size']);
@@ -571,7 +563,6 @@ class HTTPRequester
      */
     protected static function httpBuildQuery(array $query, $parent = '') {
         $params = array();
-
         foreach ($query as $key => $value) {
             $key = ($parent ? $parent . '[' . rawurlencode($key) . ']' : rawurlencode($key));
 
@@ -588,8 +579,6 @@ class HTTPRequester
                 $params[] = $key . '=' . str_replace('%2F', '/', rawurlencode($value));
             }
         }
-
         return implode('&', $params);
     }
-
 }

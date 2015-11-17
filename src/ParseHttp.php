@@ -10,13 +10,13 @@ class ParseHttp
 
     // Property of this class is following the $result object,
     // that define by drupal_http_request().
-    var $request;
-    var $data;
-    var $protocol;
-    var $status_message;
-    var $headers;
-    var $code;
-    var $error;
+    public $request;
+    public $data;
+    public $protocol;
+    public $status_message;
+    public $headers;
+    public $code;
+    public $error;
 
     function __construct($response = NULL) {
         if (isset($response)) {
@@ -81,12 +81,6 @@ class ParseHttp
             else {
                 $this->headers[$name] = trim($value);
             }
-            // if (isset($this->headers[$name]) && $name == 'set-cookie') {
-                // $this->headers[$name] .= ',' . trim($value);
-            // }
-            // else {
-                // $this->headers[$name] = trim($value);
-            // }
         }
 
         $responses = array(
@@ -139,14 +133,12 @@ class ParseHttp
         $this->code = $code;
     }
 
-    public function parse_curl() {
-
-    }
+    // public function parse_curl() {
+    // }
 
     /**
      * Memecah informasi pada header yang mana menggunakan pola titik koma.
      */
-    public function header_explode() {
-
-    }
+    // public function header_explode() {
+    // }
 }

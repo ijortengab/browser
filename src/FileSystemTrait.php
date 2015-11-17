@@ -7,10 +7,7 @@ namespace IjorTengab\Browser;
  * Sebagian code diambil dari fungsi drupal pada file includes/file.inc.
  *
  * Trait men-declare property:
- *   public $error = array();
  *   private $cwd = __DIR__;
- *
- *
  * Pastikan tidak bentrok dengan class yang menggunakan trait ini.
  * Kunjungi Conflict Resolution pada dokumentasi PHP.
  *
@@ -21,7 +18,6 @@ namespace IjorTengab\Browser;
  */
 trait FileSystemTrait {
 
-
     /**
      * Current Working Directory.
      * Direktori tempat menyimpan apapun untuk keperluan simpan file.
@@ -31,13 +27,11 @@ trait FileSystemTrait {
     private $cwd = __DIR__;
 
     /**
-     * Property penyimpanan error.
-     */
-    public $error = array();
-
-    /**
      * Melakukan fungsi mkdir() dan diperkaya dengan penambahan informasi jika
      * terjadi kegagalan.
+     *
+     * @return
+     *   true if success and string (sentence of reason) if failed.
      */
     public function mkdir($uri, $mode = 0775) {
         try {
@@ -60,49 +54,39 @@ trait FileSystemTrait {
             return TRUE;
         }
         catch (\Exception $e) {
-            $this->error[] = $e->getMessage();
+            return $e->getMessage();
         }
     }
-    
+
     /**
      * Melakukan perubahan pada property $cwd dan diperkaya dengan penambahan
      * informasi jika terjadi kegagalan.
+     *
+     * @return
+     *   true if success and string (sentence of reason) if failed.
      */
     public function setCwd($dir, $autocreate = FALSE) {
         try {
-            if (!is_dir($dir) && !$autocreate) {
-                throw new \Exception('Set directory failed, directory not exists: "' . $dir . '".');
-            }
-            if (!is_dir($dir) && $autocreate && !$this->mkdir($dir)) {
-                throw new \Exception('Set directory failed, trying to create but failed: "' . $dir . '".');
+            if (!is_dir($dir)) {
+                if ($autocreate) {
+                    // Trying to create.
+                    $error = $this->mkdir($dir);
+                    if (is_string($error)) {
+                        throw new \Exception($error . ' ' . 'Set directory failed, trying to create but failed: "' . $dir . '".');
+                    }
+                }
+                else {
+                    throw new \Exception('Set directory failed, directory not exists: "' . $dir . '".');
+                }
             }
             if (!is_writable($dir)) {
                 throw new \Exception('Set directory failed, directory is not writable: "' . $dir . '".');
             }
-
-
-
-            // Sebelum set.
-            // Copy file-file yang berada di directory lama.
-            // $old = $this->getCwd();
-            // $new = $dir;
-            // $files = array(
-                // $this->state_filename,
-                // $this->cookie_filename,
-                // $this->history_filename,
-            // );
-            // foreach ($files as $file) {
-                // if (file_exists($old . DIRECTORY_SEPARATOR . $file)) {
-                    // rename($old . DIRECTORY_SEPARATOR . $file, $new . DIRECTORY_SEPARATOR . $file);
-                // }
-            // }
-
-            // Directory sudah siap diset.
             $this->cwd = $dir;
             return true;
         }
         catch (\Exception $e) {
-            $this->error[] = $e->getMessage();
+            return $e->getMessage();
         }
     }
 
@@ -113,13 +97,12 @@ trait FileSystemTrait {
         return $this->cwd;
     }
 
-    
-
-    // Source from Drupal 7's function file_create_filename().
     /**
-     * 
+     * Mendapatkan nama file baru jika nama file pada argument $basename
+     * sudah exists di dalam $directory. Nama file baru didapat dengan
+     * auto increment dari $basename.
      */
-    private function filenameUniquify($basename, $directory) {
+    private function fileNameUniquify($basename, $directory) {
         // Strip control characters (ASCII value < 32). Though these are allowed in
         // some filesystems, not many applications handle them well.
         $basename = preg_replace('/[\x00-\x1F]/u', '_', $basename);
@@ -127,7 +110,6 @@ trait FileSystemTrait {
             // These characters are not allowed in Windows filenames
             $basename = str_replace(array(':', '*', '?', '"', '<', '>', '|'), '_', $basename);
         }
-
         // A URI or path may already have a trailing slash or look like "public://".
         if (substr($directory, -1) == DIRECTORY_SEPARATOR) {
             $separator = '';
@@ -135,9 +117,7 @@ trait FileSystemTrait {
         else {
             $separator = DIRECTORY_SEPARATOR;
         }
-
         $destination = $directory . $separator . $basename;
-
         if (file_exists($destination)) {
             // Destination file already exists, generate an alternative.
             $pos = strrpos($basename, '.');
@@ -149,7 +129,6 @@ trait FileSystemTrait {
                 $name = $basename;
                 $ext = '';
             }
-
             $counter = 0;
             do {
                 $destination = $directory . $separator . $name . '_' . $counter++ . $ext;
@@ -157,5 +136,4 @@ trait FileSystemTrait {
         }
         return $destination;
     }
-
 }
