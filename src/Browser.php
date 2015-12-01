@@ -70,6 +70,9 @@ class Browser extends HTTPRequester
             'history_save' => FALSE,
         );
         $this->options($this->options() + $added_options);
+
+        // Set cwd with current working directory as default.
+        $this->setCwd(getcwd());
     }
 
     /**
@@ -133,7 +136,7 @@ class Browser extends HTTPRequester
 
             // Build object.
             // Jangan masukkan $filename sebagai argument saat calling parseCSV,
-            // agar tidak dilakukan parsing. Parsing hanya dilakukan saat 
+            // agar tidak dilakukan parsing. Parsing hanya dilakukan saat
             // melakukan method get.
             $this->cookie_object = new \parseCSV;
             $this->cookie_object->file = $filename;
@@ -163,7 +166,7 @@ class Browser extends HTTPRequester
         $set_cookies = (array) $this->result->headers['set-cookie'];
         $rows = array();
         foreach ($set_cookies as $set_cookie) {
-            preg_match_all('/(\w+)=([^;]*)/', $set_cookie, $parts, PREG_SET_ORDER);            
+            preg_match_all('/(\w+)=([^;]*)/', $set_cookie, $parts, PREG_SET_ORDER);
             $first = array_shift($parts);
             $data = array(
                 'name' => $first[1],

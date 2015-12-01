@@ -77,14 +77,14 @@ class HTTPRequester
     /**
      * Init and prepare default value.
      */
-    function __construct($url = NULL) {
+    function __construct($url = null) {
         // Set url.
         if (!empty($url)) {
             $this->setUrl($url);
         }
 
         // Prefered using curl.
-        $this->curl(TRUE);
+        $this->curl(true);
 
         // Default value.
         $this->options('encoding', 'gzip, deflate');
@@ -139,12 +139,12 @@ class HTTPRequester
      * Switch if you want use curl library as driver to request HTTP.
      * Curl support to compressed response.
      */
-    public function curl($switch = TRUE) {
+    public function curl($switch = true) {
         if ($switch && function_exists('curl_init')) {
-            $this->curl = TRUE;
+            $this->curl = true;
         }
         else {
-            $this->curl = FALSE;
+            $this->curl = false;
         }
         return $this;
     }
@@ -181,7 +181,7 @@ class HTTPRequester
             $this->setUrl($url);
         }
         if (!isset($this->timer)) {
-            $this->timer = new timer;
+            $this->timer = new Timer;
         }
         $url = $this->getUrl();
         if (empty($url)) {
@@ -414,7 +414,7 @@ class HTTPRequester
             $headers['Content-Type'] = 'application/x-www-form-urlencoded';
             $options['method'] = 'POST';
             // $options['data'] = http_build_query($post);
-            $options['data'] = self::drupal_http_build_query($post);
+            $options['data'] = self::httpBuildQuery($post);
         }
 
         // Support proxy.
