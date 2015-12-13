@@ -1,24 +1,23 @@
 <?php
 namespace IjorTengab\Browser;
 
+use IjorTengab\Traits\FileSystemTrait;
+
 /**
- * Class browser.
- *
- * Extends dari HTTPRequester dengan menambah fitur-fitur seperti layaknya
- * sebuah browser.
+ * Class Browser. Extends dari class Engine dengan menambah fitur-fitur
+ * seperti layaknya sebuah browser.
  *
  * Fitur tersedia:
  *  - Save HTML sebagai cache
  *  - Cookie
  *  - History Log
- *  - Berbagai fungsi static untuk keperluan cepat (shortcut).
+ *
+ * Todo:
+ *   - Method ::profile() dibuat dengan skema unparse User-Agent
  */
-class Browser extends HTTPRequester
+class Browser extends Engine
 {
 
-    /**
-     * Load berbagai method terkait direktori.
-     */
     use FileSystemTrait;
 
     /**
@@ -30,7 +29,9 @@ class Browser extends HTTPRequester
     /**
      * Nama file untuk penyimpanan data cookie.
      */
-    protected $cookie_filename = 'cookie.csv';
+    public $cookie_filename = 'cookie.csv';
+
+    protected $cookie_file_has_changed = false;
 
     /**
      * Reference of field of cookie.
@@ -40,12 +41,12 @@ class Browser extends HTTPRequester
     /**
      * Nama file untuk penyimpanan data history.
      */
-    protected $history_filename = 'history.log';
+    public $history_filename = 'history.log';
 
     /**
      * Nama file referensi untuk penyimpanan "message body" hasil request.
      */
-    protected $_cache_filename = 'cache.html';
+    public $_cache_filename = 'cache.html';
 
     /**
      * Nama file saat ini hasil dari penyimpanan "message body" hasil request.
@@ -55,7 +56,8 @@ class Browser extends HTTPRequester
     /**
      * Construct.
      */
-    function __construct($url = NULL) {
+    public function __construct($url = NULL)
+    {
         // Execute Parent.
         parent::__construct($url);
         // Tambah nilai default dari property $options.
@@ -70,15 +72,58 @@ class Browser extends HTTPRequester
             'history_save' => FALSE,
         );
         $this->options($this->options() + $added_options);
+    }
 
-        // Set cwd with current working directory as default.
-        $this->setCwd(getcwd());
+    /**
+     * Create instance and setup with package browser style.
+     */
+    public static function profile($user_agent_scenario = null)
+    {
+        // Todo, buat dengan skema unparse User Agent.
+        $instance = new Browser;
+        $user_agent = self::getUserAgent($user_agent_scenario);
+        $instance->options('cookie_receive', true)
+                 ->options('cookie_send', true)
+                 ->options('follow_location', true)
+                 ->options('user_agent', $user_agent);
+        return $instance;
+    }
+
+    public static function getUserAgent($user_agent_scenario)
+    {
+        $user_agent_scenario = trim($user_agent_scenario);
+        if (empty($user_agent_scenario)) {
+            return;
+        }
+        $user_agent_scenario = strtolower(trim($user_agent_scenario));
+        $user_agent = '';
+        switch ($user_agent_scenario) {
+            // Todo, build random mobile, current Iphone 3.
+            case 'mobile':
+            case 'mobile browser':
+                $user_agent = 'Mozilla/5.0 (iPhone; U; CPU iPhone OS 3_0 like Mac OS X; en-us) AppleWebKit/528.18 (KHTML, like Gecko) Version/4.0 Mobile/7A341 Safari/528.16';
+                break;
+
+            case 'mozilla firefox on windows 7':
+                $user_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:42.0) Gecko/20100101 Firefox/42.0';
+                break;
+
+            // Todo, build random desktop.
+            case 'desktop':
+            default:
+                // Default, google chrome on windows 7 64 bit.
+                $user_agent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.80 Safari/537.36';default:
+                break;
+        }
+        return $user_agent;
     }
 
     /**
      * @inherit
      */
-    protected function preExecute() {
+    protected function preExecute()
+    {
+        parent::preExecute();
         if ($this->options('cookie_send')) {
             $this->cookieRead();
         }
@@ -87,7 +132,9 @@ class Browser extends HTTPRequester
     /**
      * @inherit
      */
-    protected function postExecute() {
+    protected function postExecute()
+    {
+        parent::postExecute();
         if ($this->options('cookie_receive')) {
             $this->cookieWrite();
         }
@@ -103,12 +150,10 @@ class Browser extends HTTPRequester
      * Memulai melakukan instance dari class parseCSV.
      * Menyimpan hasilnya di property $cookie.
      */
-    protected function cookieInit($autocreate = FALSE) {
+    protected function cookieInit($autocreate = FALSE)
+    {
         try {
-            if (!isset($this->cwd)) {
-                throw new \Exception('Current Working Directory not set yet.');
-            }
-            $filename = $this->cwd . DIRECTORY_SEPARATOR . $this->cookie_filename;
+            $filename = $this->setFullPath($this->cookie_filename);
             if (!file_exists($filename) && !$autocreate) {
                 return FALSE;
             }
@@ -120,24 +165,20 @@ class Browser extends HTTPRequester
                 $size = filesize($filename);
                 if (empty($size)) {
                     $create = TRUE;
-                    // Perlu di clear info filesize
-                    // atau error saat eksekusi parent::_rfile().
-                    // @see: http://php.net/filesize > Notes.
-                    clearstatcache(TRUE, $filename);
                 }
             }
             if ($create) {
                 $header = implode(',', $this->cookie_field);
-                file_put_contents($filename, $header . PHP_EOL);
-            }
-            if (!file_exists($filename)) {
-                throw new \Exception('Failed to create cookie file, build Cookie canceled: "' . $filename . '".');
+                if (file_put_contents($filename, $header . PHP_EOL) === false) {
+                    throw new \Exception('Failed to create cookie file, build Cookie canceled: "' . $filename . '".');
+                }
+                $this->cookie_file_has_changed = true;
             }
 
             // Build object.
             // Jangan masukkan $filename sebagai argument saat calling parseCSV,
-            // agar tidak dilakukan parsing. Parsing hanya dilakukan saat
-            // melakukan method get.
+            // agar tidak langsung dilakukan parsing. Parsing hanya dilakukan
+            // saat melakukan method ::cookieRead().
             $this->cookie_object = new \parseCSV;
             $this->cookie_object->file = $filename;
 
@@ -154,11 +195,12 @@ class Browser extends HTTPRequester
      * Write info "Set-Cookie" from response header to storage of cookie.
      * We use CSV file for storage.
      */
-    protected function cookieWrite() {
-        if (empty($this->cookie_object) && !$this->cookieInit(true)) {
+    protected function cookieWrite()
+    {
+        if (!isset($this->result->headers['set-cookie'])) {
             return;
         }
-        if (!isset($this->result->headers['set-cookie'])) {
+        if (empty($this->cookie_object) && !$this->cookieInit(true)) {
             return;
         }
         $url = $this->getUrl();
@@ -198,21 +240,41 @@ class Browser extends HTTPRequester
         }
         // Save cookie, append to the file CSV.
         $this->cookie_object->save(NULL, $rows, true);
+        $this->cookie_file_has_changed = true;
+    }
+
+    /**
+     * Untuk eksekusi berulang-ulang, maka untuk membaca kembali file cookie
+     * perlu dilakukan clear cache pada filesize cookie karena class parseCSV
+     * pada method ::_rfile() melakukan fungsi filesize() dimana jika cookie
+     * ada perubahan karena penambahan data, maka return value pada filesize()
+     * belum berubah karena fitur cache pada PHP.
+     */
+    protected function cookieReload()
+    {
+        if ($this->cookie_file_has_changed) {
+            $filename = $this->setFullPath($this->cookie_filename);
+            clearstatcache(true, $filename);
+            $this->cookie_file_has_changed = false;
+        }
     }
 
     /**
      * Read info cookie about domain from storage, and set to request heeader.
      * We use CSV file for storage.
      */
-    protected function cookieRead() {
+    protected function cookieRead()
+    {
         if (empty($this->cookie_object) && !$this->cookieInit()) {
             return;
         }
         // Parse csv now.
+        $this->cookieReload();
         $this->cookie_object->parse();
         // Get result.
         $data = $this->cookie_object->data;
         $parse_url = $this->parse_url;
+
         // Lakukan filtering data.
         $storage = array();
         foreach($data as $key => $row) {
@@ -277,23 +339,25 @@ class Browser extends HTTPRequester
      * dan akan dilakukan "rename" otomatis dengan suffix angka serial, dan
      * "current filename" dapat diakses dari property $cache_filename.
      */
-    protected function cacheSave() {
+    protected function cacheSave()
+    {
         if (empty($this->result->data)) {
             return;
         }
-        $_filename = $this->_cache_filename;
-        $directory = $this->getCwd();
-        $filename = $this->fileNameUniquify($_filename, $directory);
+        $_filename = $this->setFullPath($this->_cache_filename);
+        $directory = dirname($_filename);
+        $basename = basename($_filename);
+        $filename = $this->fileNameUniquify($basename, $directory);
         // Saving.
         $content = $this->result->data;
         try {
             if (@file_put_contents($filename, $content) === FALSE) {
-                throw new Exception('Failed to write content to: "' . $this->filename . '".');
+                throw new \Exception('Failed to write content to: "' . $filename . '".');
             }
             // Save current filename.
             $this->cache_filename = $filename;
         }
-        catch (Exception $e) {
+        catch (\Exception $e) {
             $this->error[] = $e->getMessage();
         }
     }
@@ -302,22 +366,33 @@ class Browser extends HTTPRequester
      * Menyimpan history request http. Berguna untuk "debugging". Mirip seperti
      * file access.log pada web server.
      */
-    protected function historySave() {
-        $filename = $this->getCwd() . DIRECTORY_SEPARATOR . $this->history_filename;
+    protected function historySave()
+    {
+        $filename = $this->setFullPath($this->history_filename);
         $content = '';
         !isset($this->result->request) or $content .= 'REQUEST:' . "\t" . preg_replace("/\r\n|\n|\r/", "\t", $this->result->request) . PHP_EOL;
-        !isset($this->result->headers_raw) or $content .= 'RESPONSE:' . "\t" . implode("\t", $this->result->headers_raw) . PHP_EOL;
-        if ($this->options('cache_save')) {
-            $content .= 'CACHE:' . "\t" . $this->cache_filename . PHP_EOL;
+        !isset($this->result->headers_raw) or $content .= 'RESPONSE:' . "\t" . $this->result->protocol . ' ' .  $this->result->code . ' ' . $this->result->status_message . "\t\t" . implode("\t", $this->result->headers_raw) . PHP_EOL;
+        !isset($this->cache_filename) or $content .= 'CACHE:' . "\t\t" . $this->cache_filename . PHP_EOL;
+        if (empty($content)) {
+            return;
         }
-        $content .= PHP_EOL;
+        $content = 'TIME:' . "\t\t" . date('c') . PHP_EOL . $content . PHP_EOL;
         try {
             if (@file_put_contents($filename, $content, FILE_APPEND) === FALSE) {
-                throw new Exception('Failed to write content to: "' . $filename . '".');
+                throw new \Exception('Failed to write content to: "' . $filename . '".');
             }
         }
-        catch (Exception $e) {
+        catch (\Exception $e) {
             $this->error[] = $e->getMessage();
         }
+    }
+
+    /**
+     * @inherit.
+     */
+    public function reset()
+    {
+        $this->cache_filename = null;
+        return parent::reset();
     }
 }

@@ -1,28 +1,31 @@
-### Standard Example for Scratch
+Browser, PHP HTTP Client
+========================
 
-Use this example if you working without [composer](http://getcomposer.org).
+HTTP Requester like a browser, automatically save and load cookie, 
+follow location, and save the history and cache.
 
 ```php
-<?php
-require('browser.php');
-use IjorTengab\browser;
-$url = 'http://localhost/GitHub/browser/test2.php';
-$b = new browser();
-$b->setUrl($url);
-$b->browse();
-$result = $b->result;
-print_r($result);
-
+// Simple request.
+$browser = Browser::profile('Mozilla Firefox on Windows 7');
+$html = (string) $browser->setUrl('http://httpbin.org/html')->execute()->result;
 ```
 
-Another example for Scratch (Short code)
-
 ```php
-<?php
-require('browser.php');
+// Post request, login, and enter to authenticated page.
+$browser = Browser::profile('Mobile');
+$browser->setUrl('http://httpbin.org/post');
+$browser->post([
+    'username' => 'IwanFals',
+    'password' => 'SoreTuguPancoran',
+]);
+$browser->headers('Referer', 'http://httpbin.org/');
+$browser->options('timeout', 5);
+$browser->execute();
+// Cookie automatically saved.
+$browser->reset()->setUrl('http://httpbin.org/member-area-only')->execute();
+// Cookie automatically loaded, and with session information in cookie
+// you can enter page which is for authenticated only.
+$code = $browser->result->code; // 200 OK.
+$html = $browser->result->data;
+```
 
-use IjorTengab\browser\browser;
-
-$url = 'http://localhost/GitHub/browser/test2.php';
-$result = new 
-?>

@@ -1,5 +1,5 @@
-test.php
-test2.php
+test_client.php
+test_server.php
 TODO.md
 vendor/
 composer.lock

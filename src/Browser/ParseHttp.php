@@ -7,7 +7,6 @@ namespace IjorTengab\Browser;
  */
 class ParseHttp
 {
-
     // Property of this class is following the $result object,
     // that define by drupal_http_request().
     public $request;
@@ -18,10 +17,15 @@ class ParseHttp
     public $code;
     public $error;
 
-    function __construct($response = NULL) {
-        if (isset($response)) {
+    public function __construct($response = NULL) {
+        if (!empty($response)) {
             $this->parse($response);
         }
+    }
+
+    public function __toString()
+    {
+        return $this->data;
     }
 
     public function parse($response) {
@@ -132,13 +136,4 @@ class ParseHttp
         }
         $this->code = $code;
     }
-
-    // public function parse_curl() {
-    // }
-
-    /**
-     * Memecah informasi pada header yang mana menggunakan pola titik koma.
-     */
-    // public function header_explode() {
-    // }
 }

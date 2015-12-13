@@ -1,16 +1,25 @@
 <?php
 namespace IjorTengab\Browser;
 
+use IjorTengab\Traits\ObjectManagerTrait;
+
 /**
- * Class dasar untuk melakukan request http.
- * Seluruh hasil disimpan dalam property $result.
+ * Class untuk melakukan request http. Menggunakan library curl dan php stream
+ * (dapat dipilih). Seluruh hasil disimpan dalam property $result.
+ *
+ * Todo:
+ * - post dengan curl masih error
+ * - buat support untuk post file.
+ *
+ * @link
+ *   http://php.net/manual/en/ref.stream.php
+ *   http://php.net/manual/en/book.curl.php
+ *   https://api.drupal.org/api/function/drupal_http_request/7
  */
-class HTTPRequester
+class Engine
 {
-    /**
-     * Calling required traits.
-     */
-    use PropertyAgentTrait;
+
+    use ObjectManagerTrait;
 
     /**
      * The main URL to request http.
@@ -32,12 +41,12 @@ class HTTPRequester
     /**
      * Property untuk menyimpan error yang terjadi.
      */
-    public $error = array();
+    public $error = [];
 
     /**
      * Property untuk menyimpan options.
      */
-    public $options = array(
+    public $options = [
         'method' => 'GET',
         'data' => NULL,
         'max_redirects' => 3,
@@ -50,23 +59,23 @@ class HTTPRequester
         'proxy_username' => '',
         'proxy_password' => '',
         'proxy_user_agent' => '',
-    );
+    ];
 
     /**
      * Property untuk menyimpan data header saat request http.
      */
-    public $headers = array();
+    public $headers = [];
 
     /**
      * Property untuk menyimpan data post saat request http.
      */
-    public $post = array();
+    public $post = [];
 
     /**
      * Property untuk menyimpan object dari class Timer.
      * Object ini berguna untuk menghitung waktu request.
      */
-    private $timer;
+    protected $timer;
 
     /**
      * Property untuk menyimpan hasil requst http. Value adalah object dari
@@ -77,7 +86,9 @@ class HTTPRequester
     /**
      * Init and prepare default value.
      */
-    function __construct($url = null) {
+    function __construct($url = null)
+    {
+
         // Set url.
         if (!empty($url)) {
             $this->setUrl($url);
@@ -94,7 +105,8 @@ class HTTPRequester
      * Method untuk set url kedalam class.
      * Verifikasi akan dilakukan saat set url.
      */
-    public function setUrl($url) {
+    public function setUrl($url)
+    {
         try {
             $parse_url = parse_url($url);
             if (!isset($parse_url['scheme'])) {
@@ -131,7 +143,8 @@ class HTTPRequester
         }
     }
 
-    public function getUrl() {
+    public function getUrl()
+    {
         return $this->url;
     }
 
@@ -139,7 +152,8 @@ class HTTPRequester
      * Switch if you want use curl library as driver to request HTTP.
      * Curl support to compressed response.
      */
-    public function curl($switch = true) {
+    public function curl($switch = true)
+    {
         if ($switch && function_exists('curl_init')) {
             $this->curl = true;
         }
@@ -152,31 +166,39 @@ class HTTPRequester
     /**
      * Method for retrieve and update property $options.
      */
-    public function options() {
-        return $this->propertyAgent('options', func_get_args());
+    public function options()
+    {
+        return $this->propertyArrayManager('options', func_get_args());
     }
 
     /**
-     * Method for retrieve and update property $options.
+     * Method for retrieve and update property $headers.
      */
-    public function headers() {
-        return $this->propertyAgent('headers', func_get_args());
+    public function headers()
+    {
+        return $this->propertyArrayManager('headers', func_get_args());
     }
 
     /**
-     * Method for retrieve and update property $options.
+     * Method for retrieve and update property $post.
      */
-    public function post() {
-        return $this->propertyAgent('post', func_get_args());
+    public function post()
+    {
+        return $this->propertyArrayManager('post', func_get_args());
     }
 
     /**
      * Main function to browse the URL setted.
      */
-    public function execute($url = NULL) {
+    public function execute($url = NULL)
+    {
         /**
-         * Mandatory property.
+         * Mandatory cwd.
          */
+        if ($error = $this->cwdInit()) {
+            $this->chDir(getcwd());
+            $this->error[] = $error;
+        }
         if (isset($url)) {
             $this->setUrl($url);
         }
@@ -209,7 +231,8 @@ class HTTPRequester
     /**
      * Execute with preferred media.
      */
-    protected function _execute() {
+    protected function _execute()
+    {
         $method = $this->curl ? 'requesterCurl' : 'requesterStream';
         return $this->{$method}();
     }
@@ -217,19 +240,27 @@ class HTTPRequester
     /**
      * Method dijalankan sebelum execute.
      */
-    protected function preExecute() {
+    protected function preExecute()
+    {
+        if ($this->options('user_agent')) {
+            $this->headers('User-Agent', $this->options('user_agent'));
+        }
     }
 
     /**
      * Method dijalankan sesudah execute.
      */
-    protected function postExecute() {
+    protected function postExecute()
+    {
+        $this->post(null);
+        $this->headers(null);
     }
 
     /**
      * Menjalankan fitur auto follow location.
      */
-    private function followLocation() {
+    private function followLocation()
+    {
         switch ($this->result->code) {
             case 301: // Moved permanently
             case 302: // Moved temporarily
@@ -249,12 +280,8 @@ class HTTPRequester
                 }
                 elseif ($options['max_redirects']) {
                     $options['max_redirects']--;
-                    // We have changed and must renew options.
+                    // $options changed and have to renew.
                     $this->options($options);
-                    // We must clear cookie that set in header.
-                    $this->headers('Cookie', NULL);
-                    // Empty cache filename.
-                    $this->cache = NULL;
                     // And last, we must replace an new URL.
                     $this->setUrl($location);
                     // Browse again.
@@ -270,12 +297,14 @@ class HTTPRequester
      * because we must handle set-cookie and save history.
      * Redirect is handle outside curl.
      */
-    protected function requesterCurl() {
+    protected function requesterCurl()
+    {
         $url = $this->getUrl();
         $uri = $this->parse_url;
         $options = $this->options();
         $headers = $this->headers();
         $post = $this->post();
+        // $debugname = 'post'; echo "\r\n<pre>" . __FILE__ . ":" . __LINE__ . "\r\n". 'var_dump(' . $debugname . '): '; var_dump($$debugname); echo "</pre>\r\n";
 
         // Start curl.
         $ch = curl_init();
@@ -328,7 +357,7 @@ class HTTPRequester
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
         }
         // Set header.
-        $_ = array();
+        $_ = [];
         foreach ($headers as $header => $value) {
             $_[] = $header . ': ' . $value;
         }
@@ -393,7 +422,8 @@ class HTTPRequester
      * Request HTTP using stream.
      * This method is modified from function drupal_http_request in Drupal 7.
      */
-    protected function requesterStream() {
+    protected function requesterStream()
+    {
         $result = new ParseHttp;
         $url = $this->getUrl();
         $uri = $this->parse_url;
@@ -561,8 +591,9 @@ class HTTPRequester
     /**
      * Function from Drupal 7, drupal_http_build_query().
      */
-    protected static function httpBuildQuery(array $query, $parent = '') {
-        $params = array();
+    protected static function httpBuildQuery(array $query, $parent = '')
+    {
+        $params = [];
         foreach ($query as $key => $value) {
             $key = ($parent ? $parent . '[' . rawurlencode($key) . ']' : rawurlencode($key));
 
@@ -580,5 +611,21 @@ class HTTPRequester
             }
         }
         return implode('&', $params);
+    }
+
+    /**
+     * This object can execute repeatly, so we provide reset feature.
+     * It is recomended to use ::reset() before next ::execute().
+     */
+    public function reset()
+    {
+        $this->url = null;
+        $this->original_url = null;
+        $this->parse_url = null;
+
+        if ($this->timer instanceof Timer) {
+            $this->timer->start = microtime(TRUE);
+        }
+        return $this;
     }
 }

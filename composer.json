@@ -1,20 +1,20 @@
 {
     "name": "ijortengab/browser",
-    "description": "HTTP Requester like a browser, automatically save cookie, follow location, and save the history and cache.",
+    "description": "HTTP Requester like a browser, automatically save and load cookie, follow location, and save the history and cache.",
     "type": "library",
     "license": "GPL",
     "authors": [
         {
             "name": "IjorTengab",
             "email": "m_roji28@yahoo.com",
-            "homepage": "http://github.com/ijortengab",
-            "role": "Developer"
+            "homepage": "http://github.com/ijortengab"
         }
     ],
     "require": {
+        "php": ">=5.4.0",
         "parsecsv/php-parsecsv": "0.4.5"
     },
     "autoload": {
-        "psr-4": {"IjorTengab\\Browser\\": "src/"}
+        "psr-4": {"IjorTengab\\": "src/"}
     }
 }
