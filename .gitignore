@@ -3,3 +3,4 @@ test_server.php
 TODO.md
 vendor/
 composer.lock
+*.patch

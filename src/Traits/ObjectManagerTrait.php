@@ -12,11 +12,12 @@ namespace IjorTengab\Traits;
  *   https://github.com/ijortengab/tools
  *
  * @version
- *   0.0.1
+ *   0.0.2
  *
- * Trait berisi kumpulan method terkait object. Terdapat dua method:
+ * Trait berisi kumpulan method terkait object, yakni:
  *   - ::propertyArrayManager(), untuk mengolah property bertipe array.
  *   - ::underScoreToCamelCase(), untuk mengubah string menjadi camelCase.
+ *   - ::flatyArray(), mengubah array multidimensi menjadi satu dimensi.
  *
  * Trait ini tidak memiliki repository mandiri, hadir (shipped) bersama
  * project lain. Untuk melihat perkembangan dari trait ini bisa dilihat
@@ -251,5 +252,74 @@ trait ObjectManagerTrait
         } while(count($explode) > ++$x);
 
         return $method;
+    }
+
+    /**
+     * Mengubah array multidimensi menjadi satu dimensi.
+     *
+     * Contoh:
+     *
+     * ```php
+     * // Drupal 7 fields.
+     * $array = [
+     *     'field_file_1' => [
+     *         'und' => [
+     *             0 => [
+     *                 '_weight' => 0,
+     *                 'fid' => 0,
+     *                 'display' => 1,
+     *             ],
+     *         ],
+     *     ],
+     *     'field_file_2' => [
+     *         'und' => [
+     *             0 => [
+     *                 '_weight' => 0,
+     *                 'fid' => 0,
+     *                 'display' => 1,
+     *             ],
+     *         ],
+     *     ],
+     * ];
+     * // Array diatas akan menjadi seperti ini:
+     * $array = [
+     *      ["field_file_1[und][0][_weight]"] => 0,
+     *      ["field_file_1[und][0][fid]"] => 0,
+     *      ["field_file_1[und][0][display]"] => 1,
+     *      ["field_file_2[und][0][_weight]"] => 0,
+     *      ["field_file_2[und][0][fid]"] => 0,
+     *      ["field_file_2[und][0][display]"] => 1,
+     *  ];
+     * ```
+     *
+     * Array dalam bentuk flat ini digunakan khususnya untuk http request post.
+     * Class IjorTengab\Browser\Browser menggunakan fungsi ini.
+     *
+     */
+    public static function flatyArray($array)
+    {
+        $result = [];
+        foreach ($array as $key_master => $value) {
+            self::_flatyArray($result, $key_master, $value);
+        }
+        return $result;
+    }
+
+    /**
+     * Do recursive.
+     */
+    private static function _flatyArray(&$result, &$key, $value)
+    {
+        if (is_array($value)) {
+            foreach ($value as $k => $v) {
+                $_key = $key;
+                $key .= '[' . $k . ']';
+                self::_flatyArray($result, $key, $v);
+                $key = $_key;
+            }
+        }
+        else{
+            $result[$key] = $value;
+        }
     }
 }

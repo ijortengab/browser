@@ -317,7 +317,7 @@ class Engine
             $headers['Content-Type'] = 'multipart/form-data';
             // $headers['Content-Type'] = 'application/x-www-form-urlencoded';
             curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, self::flatyArray($post));
         }
         // Support proxy.
         $proxy_server = $this->options('proxy_server');
@@ -444,6 +444,7 @@ class Engine
             $headers['Content-Type'] = 'application/x-www-form-urlencoded';
             $options['method'] = 'POST';
             // $options['data'] = http_build_query($post);
+            $post = self::flatyArray($post);
             $options['data'] = self::httpBuildQuery($post);
         }
 
