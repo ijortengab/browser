@@ -1,10 +1,10 @@
 Browser, PHP HTTP Client
 ========================
 
-HTTP Requester like a browser, automatically save and load cookie, 
+HTTP Requester like a browser, automatically save and load cookie,
 follow location, and save the history and cache.
 
-Requirement:  
+Requirement:
   - PHP > 5.4.0
   - [IjorTengab Tools][1] > 0.0.1
 

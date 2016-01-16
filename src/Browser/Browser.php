@@ -4,6 +4,7 @@ namespace IjorTengab\Browser;
 
 use IjorTengab\FileSystem\FileName;
 use IjorTengab\FileSystem\WorkingDirectory;
+use IjorTengab\Logger\Log;
 
 /**
  * Class Browser. Extends dari class Engine dengan menambah fitur-fitur
@@ -61,13 +62,13 @@ class Browser extends Engine
     /**
      * Construct.
      */
-    public function __construct($url = NULL)
+    public function __construct($url = null, Log $log = null)
     {
         // Execute Parent.
-        parent::__construct($url);
-        
+        parent::__construct($url, $log);
+
         // Cwd must initialize when construct.
-        $this->cwd = new WorkingDirectory;
+        $this->cwd = new WorkingDirectory(null, $this->log);
 
         // Tambah nilai default dari property $options.
         $added_options = array(
@@ -179,7 +180,8 @@ class Browser extends Engine
             if ($create) {
                 $header = implode(',', $this->cookie_field);
                 if (file_put_contents($filename, $header . PHP_EOL) === false) {
-                    throw new \Exception('Failed to create cookie file, build Cookie canceled: "' . $filename . '".');
+                    $this->log->error('Failed to create cookie file, build Cookie canceled: {filename}.', ['filename' => $filename]);
+                    throw new \Exception;
                 }
                 $this->cookie_file_has_changed = true;
             }
@@ -196,7 +198,6 @@ class Browser extends Engine
             return true;
         }
         catch (\Exception $e) {
-            $this->error[] = $e->getMessage();
         }
     }
 
@@ -377,13 +378,13 @@ class Browser extends Engine
         $content = $this->result->data;
         try {
             if (@file_put_contents($filename, $content) === FALSE) {
-                throw new \Exception('Failed to write content to: "' . $filename . '".');
+                $this->log->error('Failed to write content to: {filename}.', ['filename' => $filename]);
+                throw new \Exception;
             }
             // Save current filename.
             $this->cache_filename = $filename;
         }
         catch (\Exception $e) {
-            $this->error[] = $e->getMessage();
         }
     }
 
@@ -402,13 +403,9 @@ class Browser extends Engine
             return;
         }
         $content = 'TIME:' . "\t\t" . date('c') . PHP_EOL . $content . PHP_EOL;
-        try {
-            if (@file_put_contents($filename, $content, FILE_APPEND) === FALSE) {
-                throw new \Exception('Failed to write content to: "' . $filename . '".');
-            }
-        }
-        catch (\Exception $e) {
-            $this->error[] = $e->getMessage();
+
+        if (@file_put_contents($filename, $content, FILE_APPEND) === FALSE) {
+            $this->log->error('Failed to write content to: {filename}.', ['filename' => $filename]);
         }
     }
 

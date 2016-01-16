@@ -1,8 +1,10 @@
 <?php
+
 namespace IjorTengab\Browser;
 
 use IjorTengab\ObjectHelper\ArrayDimensional;
 use IjorTengab\ObjectHelper\PropertyArrayManagerTrait;
+use IjorTengab\Logger\Log;
 use IjorTengab\Timer\Timer;
 
 /**
@@ -43,9 +45,9 @@ class Engine
     public $parse_url;
 
     /**
-     * Property untuk menyimpan error yang terjadi.
+     * Property untuk menyimpan log yang terjadi.
      */
-    public $error = [];
+    public $log;
 
     /**
      * Property untuk menyimpan options.
@@ -90,8 +92,16 @@ class Engine
     /**
      * Init and prepare default value.
      */
-    function __construct($url = null)
+    function __construct($url = null, Log $log = null)
     {
+        // Init log.
+        if (null === $log) {
+            $this->log = new Log;
+        }
+        else {
+            $this->log = $log;
+        }
+
         // Set url.
         if (!empty($url)) {
             $this->setUrl($url);
@@ -115,17 +125,20 @@ class Engine
             if (!isset($parse_url['scheme'])) {
                 // Delete current url.
                 $this->url = null;
-                throw new \Exception('Scheme pada URL tidak diketahui: "' . $url . '".');
+                $this->log->error('Scheme pada URL tidak diketahui: {url}.', ['url' => $url]);
+                throw new \Exception;
             }
             if (!in_array($parse_url['scheme'], array('http', 'https'))) {
                 // Delete current url.
                 $this->url = null;
-                throw new \Exception('Scheme pada URL hanya mendukung http atau https: "' . $url . '".');
+                $this->log->error('Scheme pada URL hanya mendukung http atau https: {url}.', ['url' => $url]);
+                throw new \Exception;
             }
             if (!isset($parse_url['host'])) {
                 // Delete current url.
                 $this->url = null;
-                throw new \Exception('Host pada URL tidak diketahui: "' . $url . '".');
+                $this->log->error('Host pada URL tidak diketahui: {url}.', ['url' => $url]);
+                throw new \Exception;
             }
             if (!isset($parse_url['path'])) {
                 // Untuk mencocokkan info pada cookie, maka path perlu ada,
@@ -142,7 +155,7 @@ class Engine
             return $this;
         }
         catch (\Exception $e) {
-            $this->error[] = $e->getMessage();
+            $this->log->error('Set Url failed.');
         }
     }
 
@@ -203,7 +216,7 @@ class Engine
         }
         $url = $this->getUrl();
         if (empty($url)) {
-            $this->error[] = 'URL not set yet, request canceled.';
+            $this->log->error('URL not set yet, request canceled.');
             return $this;
         }
 
@@ -214,7 +227,7 @@ class Engine
 
         // Operation Error.
         if (isset($this->result->error)) {
-            $this->error[] = $this->result->error;
+            $this->log->error($this->result->error);
         }
 
         // Follow location.

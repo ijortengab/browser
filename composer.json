@@ -12,6 +12,7 @@
     ],
     "require": {
         "php": ">=5.4.0",
+        "ijortengab/tools": ">=0.0.1",
         "parsecsv/php-parsecsv": "0.4.5"
     },
     "autoload": {
