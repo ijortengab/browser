@@ -1,7 +1,9 @@
 <?php
 namespace IjorTengab\Browser;
 
-use IjorTengab\Traits\ObjectManagerTrait;
+use IjorTengab\ObjectHelper\ArrayDimensional;
+use IjorTengab\ObjectHelper\PropertyArrayManagerTrait;
+use IjorTengab\Timer\Timer;
 
 /**
  * Class untuk melakukan request http. Menggunakan library curl dan php stream
@@ -18,8 +20,10 @@ use IjorTengab\Traits\ObjectManagerTrait;
  */
 class Engine
 {
-
-    use ObjectManagerTrait;
+    /**
+     * Loading traits.
+     */
+    use PropertyArrayManagerTrait;
 
     /**
      * The main URL to request http.
@@ -79,7 +83,7 @@ class Engine
 
     /**
      * Property untuk menyimpan hasil requst http. Value adalah object dari
-     * instance class ParseHTTP.
+     * instance class HTTPResponse.
      */
     public $result;
 
@@ -88,7 +92,6 @@ class Engine
      */
     function __construct($url = null)
     {
-
         // Set url.
         if (!empty($url)) {
             $this->setUrl($url);
@@ -192,13 +195,6 @@ class Engine
      */
     public function execute($url = NULL)
     {
-        /**
-         * Mandatory cwd.
-         */
-        if ($error = $this->cwdInit()) {
-            $this->chDir(getcwd());
-            $this->error[] = $error;
-        }
         if (isset($url)) {
             $this->setUrl($url);
         }
@@ -317,7 +313,7 @@ class Engine
             $headers['Content-Type'] = 'multipart/form-data';
             // $headers['Content-Type'] = 'application/x-www-form-urlencoded';
             curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, self::flatyArray($post));
+            curl_setopt($ch, CURLOPT_POSTFIELDS, ArrayDimensional::simplify($post));
         }
         // Support proxy.
         $proxy_server = $this->options('proxy_server');
@@ -391,7 +387,7 @@ class Engine
         // echo "\r\n-----------------\r\n";
         $error = curl_errno($ch);
         curl_close($ch);
-        $result = new ParseHttp;
+        $result = new HTTPResponse;
         // $info is passing by curl.
         if (isset($info['request_header'])) {
             $result->request = $info['request_header'];
@@ -424,7 +420,7 @@ class Engine
      */
     protected function requesterStream()
     {
-        $result = new ParseHttp;
+        $result = new HTTPResponse;
         $url = $this->getUrl();
         $uri = $this->parse_url;
         $options = $this->options();
@@ -444,7 +440,7 @@ class Engine
             $headers['Content-Type'] = 'application/x-www-form-urlencoded';
             $options['method'] = 'POST';
             // $options['data'] = http_build_query($post);
-            $post = self::flatyArray($post);
+            $post = ArrayDimensional::simplify($post);
             $options['data'] = self::httpBuildQuery($post);
         }
 
@@ -584,7 +580,7 @@ class Engine
         // echo "\r\n-----------------\r\n";
         // print_r($response);
         // echo "\r\n-----------------\r\n";
-        // Drupal code stop here, next we passing to ParseHttp::parse.
+        // Drupal code stop here, next we passing to HTTPResponse::parse.
         $result->parse($response);
         return $result;
     }

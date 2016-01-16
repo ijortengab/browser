@@ -1,7 +1,9 @@
 <?php
+
 namespace IjorTengab\Browser;
 
-use IjorTengab\Traits\FileSystemTrait;
+use IjorTengab\FileSystem\FileName;
+use IjorTengab\FileSystem\WorkingDirectory;
 
 /**
  * Class Browser. Extends dari class Engine dengan menambah fitur-fitur
@@ -18,7 +20,10 @@ use IjorTengab\Traits\FileSystemTrait;
 class Browser extends Engine
 {
 
-    use FileSystemTrait;
+    /**
+     * Current Working Directory (cwd), dibuat terpisah dengan cwd milik PHP.
+     */
+    public $cwd;
 
     /**
      * Property untuk menyimpan object dari Cookies.
@@ -60,6 +65,10 @@ class Browser extends Engine
     {
         // Execute Parent.
         parent::__construct($url);
+        
+        // Cwd must initialize when construct.
+        $this->cwd = new WorkingDirectory;
+
         // Tambah nilai default dari property $options.
         $added_options = array(
             // Send cookie to the site when request.
@@ -153,7 +162,7 @@ class Browser extends Engine
     protected function cookieInit($autocreate = FALSE)
     {
         try {
-            $filename = $this->setFullPath($this->cookie_filename);
+            $filename = $this->cwd->getAbsolutePath($this->cookie_filename);
             if (!file_exists($filename) && !$autocreate) {
                 return FALSE;
             }
@@ -253,9 +262,25 @@ class Browser extends Engine
     protected function cookieReload()
     {
         if ($this->cookie_file_has_changed) {
-            $filename = $this->setFullPath($this->cookie_filename);
+            $filename = $this->cwd->getAbsolutePath($this->cookie_filename);
             clearstatcache(true, $filename);
             $this->cookie_file_has_changed = false;
+        }
+    }
+
+    /**
+     * Menghapus nilai cookie
+     *
+     * Todo. buat agar bisa clear tanpa perlu hapus file, untuk sementara dibuat
+     * rename.
+     */
+    public function cookieClear($domain = null)
+    {
+        $cookie_filename = $this->cookie_filename;
+        $cookie_filename = $this->cwd->getAbsolutePath($cookie_filename);
+        if (file_exists($cookie_filename)) {
+            $cookie_filename_new = FileName::createUnique(basename($cookie_filename), dirname($cookie_filename));
+            rename($cookie_filename, $cookie_filename_new);
         }
     }
 
@@ -344,10 +369,10 @@ class Browser extends Engine
         if (empty($this->result->data)) {
             return;
         }
-        $_filename = $this->setFullPath($this->_cache_filename);
+        $_filename = $this->cwd->getAbsolutePath($this->_cache_filename);
         $directory = dirname($_filename);
         $basename = basename($_filename);
-        $filename = $this->fileNameUniquify($basename, $directory);
+        $filename = FileName::createUnique($basename, $directory);
         // Saving.
         $content = $this->result->data;
         try {
@@ -368,7 +393,7 @@ class Browser extends Engine
      */
     protected function historySave()
     {
-        $filename = $this->setFullPath($this->history_filename);
+        $filename = $this->cwd->getAbsolutePath($this->history_filename);
         $content = '';
         !isset($this->result->request) or $content .= 'REQUEST:' . "\t" . preg_replace("/\r\n|\n|\r/", "\t", $this->result->request) . PHP_EOL;
         !isset($this->result->headers_raw) or $content .= 'RESPONSE:' . "\t" . $this->result->protocol . ' ' .  $this->result->code . ' ' . $this->result->status_message . "\t\t" . implode("\t", $this->result->headers_raw) . PHP_EOL;

@@ -5,7 +5,7 @@ namespace IjorTengab\Browser;
  * Class for parsing response of HTTP.
  * This class is modified from function drupal_http_request in Drupal 7.
  */
-class ParseHttp
+class HTTPResponse
 {
     // Property of this class is following the $result object,
     // that define by drupal_http_request().

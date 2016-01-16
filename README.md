@@ -4,10 +4,17 @@ Browser, PHP HTTP Client
 HTTP Requester like a browser, automatically save and load cookie, 
 follow location, and save the history and cache.
 
+Requirement:  
+  - PHP > 5.4.0
+  - [IjorTengab Tools][1] > 0.0.1
+
+[1]:https://github.com/ijortengab/tools
+
 ```php
 // Simple request.
 $browser = Browser::profile('Mozilla Firefox on Windows 7');
-$html = (string) $browser->setUrl('http://httpbin.org/html')->execute()->result;
+$browser->setUrl('http://httpbin.org/html')->execute();
+$html = (string) $browser->result;
 ```
 
 ```php
