@@ -67,9 +67,6 @@ class Browser extends Engine
         // Execute Parent.
         parent::__construct($url, $log);
 
-        // Cwd must initialize when construct.
-        $this->cwd = new WorkingDirectory(null, $this->log);
-
         // Tambah nilai default dari property $options.
         $added_options = array(
             // Send cookie to the site when request.
@@ -84,6 +81,15 @@ class Browser extends Engine
         $this->options($this->options() + $added_options);
     }
 
+    public function setCwd(WorkingDirectory $cwd = null)
+    {
+        if (null === $cwd) {
+            $this->cwd = new WorkingDirectory(null, $this->log);
+        }
+        else {
+            $this->cwd = $cwd;
+        }
+    }
     /**
      * Create instance and setup with package browser style.
      */
@@ -134,6 +140,10 @@ class Browser extends Engine
     protected function preExecute()
     {
         parent::preExecute();
+        if (null === $this->cwd) {
+            $this->cwd = new WorkingDirectory(null, $this->log);
+        }
+
         if ($this->options('cookie_send')) {
             $this->cookieRead();
         }
@@ -179,6 +189,7 @@ class Browser extends Engine
             }
             if ($create) {
                 $header = implode(',', $this->cookie_field);
+                $this->cwd->prepareDirectory(dirname($filename), $this->log);
                 if (file_put_contents($filename, $header . PHP_EOL) === false) {
                     $this->log->error('Failed to create cookie file, build Cookie canceled: {filename}.', ['filename' => $filename]);
                     throw new \Exception;
@@ -377,6 +388,7 @@ class Browser extends Engine
         // Saving.
         $content = $this->result->data;
         try {
+            $this->cwd->prepareDirectory(dirname($filename), $this->log);
             if (@file_put_contents($filename, $content) === FALSE) {
                 $this->log->error('Failed to write content to: {filename}.', ['filename' => $filename]);
                 throw new \Exception;
@@ -404,6 +416,7 @@ class Browser extends Engine
         }
         $content = 'TIME:' . "\t\t" . date('c') . PHP_EOL . $content . PHP_EOL;
 
+        $this->cwd->prepareDirectory(dirname($filename), $this->log);
         if (@file_put_contents($filename, $content, FILE_APPEND) === FALSE) {
             $this->log->error('Failed to write content to: {filename}.', ['filename' => $filename]);
         }
