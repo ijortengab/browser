@@ -5,7 +5,7 @@ namespace IjorTengab\Browser;
 use IjorTengab\ObjectHelper\ArrayDimensional;
 use IjorTengab\ObjectHelper\PropertyArrayManagerTrait;
 use IjorTengab\Logger\Log;
-use IjorTengab\Timer\Timer;
+use IjorTengab\DateTime\Timer;
 
 /**
  * Class untuk melakukan request http. Menggunakan library curl dan php stream
