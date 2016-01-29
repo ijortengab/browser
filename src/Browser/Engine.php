@@ -6,6 +6,7 @@ use IjorTengab\ObjectHelper\ArrayDimensional;
 use IjorTengab\ObjectHelper\PropertyArrayManagerTrait;
 use IjorTengab\Logger\Log;
 use IjorTengab\DateTime\Timer;
+use Psr\Log\LoggerInterface;
 
 /**
  * Class untuk melakukan request http. Menggunakan library curl dan php stream
@@ -92,7 +93,7 @@ class Engine
     /**
      * Init and prepare default value.
      */
-    function __construct($url = null, Log $log = null)
+    function __construct($url = null, LoggerInterface $log = null)
     {
         // Init log.
         if (null === $log) {
@@ -527,7 +528,7 @@ class Engine
             // When a network error occurs, we use a negative number so it does not
             // clash with the HTTP status codes.
             $result->code = -$errno;
-            $result->error = trim($errstr) ? trim($errstr) : t('Error opening socket @socket', array('@socket' => $socket));
+            $result->error = trim($errstr) ? trim($errstr) : Log::interpolate('Error opening socket {socket}', array('socket' => $socket));
             // Mark that this request failed. This will trigger a check of the web
             // server's ability to make outgoing HTTP requests the next time that
             // requirements checking is performed.

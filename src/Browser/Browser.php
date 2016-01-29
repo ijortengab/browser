@@ -4,7 +4,7 @@ namespace IjorTengab\Browser;
 
 use IjorTengab\FileSystem\FileName;
 use IjorTengab\FileSystem\WorkingDirectory;
-use IjorTengab\Logger\Log;
+use Psr\Log\LoggerInterface;
 
 /**
  * Class Browser. Extends dari class Engine dengan menambah fitur-fitur
@@ -52,17 +52,17 @@ class Browser extends Engine
     /**
      * Nama file referensi untuk penyimpanan "message body" hasil request.
      */
-    public $_cache_filename = 'cache.html';
+    public $_response_body_filename = 'response_body.html';
 
     /**
      * Nama file saat ini hasil dari penyimpanan "message body" hasil request.
      */
-    protected $cache_filename;
+    protected $response_body_filename;
 
     /**
      * Construct.
      */
-    public function __construct($url = null, Log $log = null)
+    public function __construct($url = null, LoggerInterface $log = null)
     {
         // Execute Parent.
         parent::__construct($url, $log);
@@ -74,7 +74,7 @@ class Browser extends Engine
             // Accept delivery of site's cookie.
             'cookie_receive' => FALSE,
             // todo doc.
-            'cache_save' => FALSE,
+            'response_body_save' => FALSE,
             // todo doc.
             'history_save' => FALSE,
         );
@@ -158,8 +158,8 @@ class Browser extends Engine
         if ($this->options('cookie_receive')) {
             $this->cookieWrite();
         }
-        if ($this->options('cache_save')) {
-            $this->cacheSave();
+        if ($this->options('response_body_save')) {
+            $this->responseBodySave();
         }
         if ($this->options('history_save')) {
             $this->historySave();
@@ -372,16 +372,16 @@ class Browser extends Engine
 
     /**
      * Menyimpan hasil request http berupa "message body" kedalam file text.
-     * Nama file hasil penyimpanan didapat dari property $_cache_filename
+     * Filename hasil penyimpanan didapat dari property $_response_body_filename
      * dan akan dilakukan "rename" otomatis dengan suffix angka serial, dan
-     * "current filename" dapat diakses dari property $cache_filename.
+     * "current filename" dapat diakses dari property $response_body_filename.
      */
-    protected function cacheSave()
+    protected function responseBodySave()
     {
         if (empty($this->result->data)) {
             return;
         }
-        $_filename = $this->cwd->getAbsolutePath($this->_cache_filename);
+        $_filename = $this->cwd->getAbsolutePath($this->_response_body_filename);
         $directory = dirname($_filename);
         $basename = basename($_filename);
         $filename = FileName::createUnique($basename, $directory);
@@ -394,7 +394,7 @@ class Browser extends Engine
                 throw new \Exception;
             }
             // Save current filename.
-            $this->cache_filename = $filename;
+            $this->response_body_filename = $filename;
         }
         catch (\Exception $e) {
         }
@@ -408,13 +408,13 @@ class Browser extends Engine
     {
         $filename = $this->cwd->getAbsolutePath($this->history_filename);
         $content = '';
-        !isset($this->result->request) or $content .= 'REQUEST:' . "\t" . preg_replace("/\r\n|\n|\r/", "\t", $this->result->request) . PHP_EOL;
-        !isset($this->result->headers_raw) or $content .= 'RESPONSE:' . "\t" . $this->result->protocol . ' ' .  $this->result->code . ' ' . $this->result->status_message . "\t\t" . implode("\t", $this->result->headers_raw) . PHP_EOL;
-        !isset($this->cache_filename) or $content .= 'CACHE:' . "\t\t" . $this->cache_filename . PHP_EOL;
+        !isset($this->result->request) or $content .= 'REQUEST:' . "\t\t " . preg_replace("/\r\n|\n|\r/", "\t", $this->result->request) . PHP_EOL;
+        !isset($this->result->headers_raw) or $content .= 'RESPONSE HEADER:' . " " . $this->result->protocol . ' ' .  $this->result->code . ' ' . $this->result->status_message . "\t\t" . implode("\t", $this->result->headers_raw) . PHP_EOL;
+        !isset($this->response_body_filename) or $content .= 'RESPONSE BODY:' . "\t " . $this->response_body_filename . PHP_EOL;
         if (empty($content)) {
             return;
         }
-        $content = 'TIME:' . "\t\t" . date('c') . PHP_EOL . $content . PHP_EOL;
+        $content = 'TIME:' . "\t\t\t " . date('c') . PHP_EOL . $content . PHP_EOL;
 
         $this->cwd->prepareDirectory(dirname($filename), $this->log);
         if (@file_put_contents($filename, $content, FILE_APPEND) === FALSE) {
@@ -427,7 +427,7 @@ class Browser extends Engine
      */
     public function reset()
     {
-        $this->cache_filename = null;
+        $this->response_body_filename = null;
         return parent::reset();
     }
 }
