@@ -229,7 +229,7 @@ class Browser extends Engine
         $set_cookies = (array) $this->result->headers['set-cookie'];
         $rows = array();
         foreach ($set_cookies as $set_cookie) {
-            preg_match_all('/(\w+)=([^;]*)/', $set_cookie, $parts, PREG_SET_ORDER);
+            preg_match_all('/([^=]+)=([^;]*)/', $set_cookie, $parts, PREG_SET_ORDER);
             $first = array_shift($parts);
             $data = array(
                 'name' => $first[1],
