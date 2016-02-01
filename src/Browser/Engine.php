@@ -54,7 +54,6 @@ class Engine
      * Property untuk menyimpan options.
      */
     public $options = [
-        'method' => 'GET',
         'data' => NULL,
         'max_redirects' => 3,
         'timeout' => 30.0,
@@ -264,6 +263,9 @@ class Engine
     {
         $this->post(null);
         $this->headers(null);
+        // Jika terjadi follow_location true, maka otomatis method untuk next
+        // request dipaksa menjadi GET, hapus kembali.
+        $this->options('method', null);
     }
 
     /**
@@ -292,6 +294,10 @@ class Engine
                     $options['max_redirects']--;
                     // $options changed and have to renew.
                     $this->options($options);
+                    // Jika method sebelumnya adalah post, maka untuk next
+                    // request yang otomatis ini tentu tidak bisa kalau post
+                    // juga, maka harus dipaksa ubah ke GET.
+                    $this->options('method', 'GET');
                     // And last, we must replace an new URL.
                     $this->setUrl($location);
                     // Browse again.
@@ -314,7 +320,6 @@ class Engine
         $options = $this->options();
         $headers = $this->headers();
         $post = $this->post();
-        // $debugname = 'post'; echo "\r\n<pre>" . __FILE__ . ":" . __LINE__ . "\r\n". 'var_dump(' . $debugname . '): '; var_dump($$debugname); echo "</pre>\r\n";
 
         // Start curl.
         $ch = curl_init();
@@ -375,8 +380,39 @@ class Engine
         // Set URL.
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLINFO_HEADER_OUT, TRUE);
+
+        // Force Method to Request.
+        if (isset($options['method'])) {
+            $method = strtoupper($options['method']);
+
+            switch ($method) {
+                case 'POST':
+                    // Meski sudah set CURLOPT_POST = true, tapi jika
+                    // argument pada CURLOPT_POSTFIELDS adalah array kosong
+                    // maka CURLOPT_POST kembali bernilai false, oleh karena itu
+                    // perlu dipaksa dengan CURLOPT_CUSTOMREQUEST.
+                    curl_setopt($ch, CURLOPT_PUT, false);
+                    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+                    break;
+
+                case 'PUT':
+                    curl_setopt($ch, CURLOPT_PUT, true);
+                    curl_setopt($ch, CURLOPT_POST, false);
+                    break;
+
+                case 'GET':
+                case 'HEAD':
+                case 'DELETE':
+                case 'CONNECT':
+                default:
+                    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+                    break;
+            }
+        }
+
         $response = curl_exec($ch);
         $info = curl_getinfo($ch);
+
         // echo "\r\n-----------------\r\n";
         // print_r($response);
         // $parse = preg_split("/\r\n\r\n|\n\n|\r\r/", $response);
@@ -445,6 +481,12 @@ class Engine
         $headers += array(
             'User-Agent' => 'Drupal (+http://drupal.org/)',
         );
+
+        // Merge the default options.
+        $options += array(
+            'method' => 'GET',
+        );
+
         // stream_socket_client() requires timeout to be a float.
         $options['timeout'] = (float) $options['timeout'];
 
