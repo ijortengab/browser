@@ -81,7 +81,7 @@ class Engine
      * Property untuk menyimpan object dari class Timer.
      * Object ini berguna untuk menghitung waktu request.
      */
-    protected $timer;
+    public $timer;
 
     /**
      * Property untuk menyimpan hasil requst http. Value adalah object dari
@@ -449,15 +449,15 @@ class Engine
             $result->code = -1;
             switch ($error) {
                 case 6:
-                    $result->error = 'cannot resolve host';
+                    $result->error = 'Cannot resolve host.';
                     break;
 
                 case 28:
-                    $result->error = 'request timed out';
+                    $result->error = 'Request timed out.';
                     break;
 
                 default:
-                    $result->error = 'error occured';
+                    $result->error = 'Error occured. Code: ' . $error . '.';
                     break;
             }
         }
