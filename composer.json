@@ -1,6 +1,6 @@
 {
     "name": "ijortengab/browser",
-    "description": "HTTP Requester like a browser, automatically save and load cookie, follow location, and save the history and cache.",
+    "description": "Turn browser software to PHP Object. A simple HTTP request/response that implements PSR-7.",
     "type": "library",
     "license": "GPL",
     "authors": [
@@ -12,10 +12,11 @@
     ],
     "require": {
         "php": ">=5.4.0",
+        "psr/http-message": "~1.0",
         "ijortengab/tools": ">=0.0.1",
         "parsecsv/php-parsecsv": "0.4.5"
     },
     "autoload": {
-        "psr-4": {"IjorTengab\\": "src/"}
+        "psr-4": {"IjorTengab\\Browser\\": "src/"}
     }
 }
